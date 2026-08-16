@@ -54,3 +54,15 @@ The API uses CORS and HttpOnly cookies for refresh token rotation.
 - **Cookies and SameSite**: For standard local development where frontend and backend are on `localhost` (even if ports differ), `SameSite=Lax` and `Secure=false` are safe and work correctly in modern browsers. If you deploy the frontend and backend on genuinely different cross-origin domains, you must override the environment variables:
   - `OFOOD_REFRESH_TOKEN_SAME_SITE=None`
   - `OFOOD_REFRESH_TOKEN_SECURE=true` (Requires HTTPS)
+
+## Render Deployment (Web Service)
+The application is pre-configured to be deployed natively on Render as a Web Service.
+Render provides several environment variables automatically, such as `PORT`.
+
+1. Ensure your Render Web Service starts with standard Maven commands.
+2. In your Render Dashboard Environment variables, provide:
+   - `SPRING_PROFILES_ACTIVE=prod` (or any appropriate profile)
+   - `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USERNAME`, `DB_PASSWORD` (often from a Render managed database)
+   - `OFOOD_FRONTEND_URL` (e.g., your deployed frontend URL)
+   - `OFOOD_JWT_PRIVATE_KEY_PATH` (must point to the absolute path of the uploaded secret file, e.g., `/etc/secrets/jwt-private.pem`)
+3. **Secret Files**: Upload your `dev-private.pem` (or production key) as a "Secret File" in Render rather than pasting its contents into an environment variable directly. The path Render provides is what you'll use for `OFOOD_JWT_PRIVATE_KEY_PATH`.

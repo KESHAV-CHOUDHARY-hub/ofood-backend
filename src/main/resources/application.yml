@@ -40,4 +40,4 @@ ofood:
       lock-duration: ${OFOOD_AUTH_LOCK_DURATION:15m}
 
 server:
-  port: 8080
+  port: ${PORT:8080}
