@@ -1,0 +1,12 @@
+target/
+.idea/
+*.iml
+.mvn/
+mvnw
+mvnw.cmd
+.env
+.env.*
+*.pem
+*.key
+*.jks
+config/keys/

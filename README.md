@@ -56,13 +56,20 @@ The API uses CORS and HttpOnly cookies for refresh token rotation.
   - `OFOOD_REFRESH_TOKEN_SECURE=true` (Requires HTTPS)
 
 ## Render Deployment (Web Service)
-The application is pre-configured to be deployed natively on Render as a Web Service.
+The application is pre-configured to be deployed natively on Render as a Web Service, or using Docker.
 Render provides several environment variables automatically, such as `PORT`.
 
-1. Ensure your Render Web Service starts with standard Maven commands.
+1. Ensure your Render Web Service starts with standard Maven commands or by deploying the Dockerfile.
 2. In your Render Dashboard Environment variables, provide:
    - `SPRING_PROFILES_ACTIVE=prod` (or any appropriate profile)
    - `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USERNAME`, `DB_PASSWORD` (often from a Render managed database)
    - `OFOOD_FRONTEND_URL` (e.g., your deployed frontend URL)
    - `OFOOD_JWT_PRIVATE_KEY_PATH` (must point to the absolute path of the uploaded secret file, e.g., `/etc/secrets/jwt-private.pem`)
 3. **Secret Files**: Upload your `dev-private.pem` (or production key) as a "Secret File" in Render rather than pasting its contents into an environment variable directly. The path Render provides is what you'll use for `OFOOD_JWT_PRIVATE_KEY_PATH`.
+
+### Docker Deployment
+You can build and run this application using Docker:
+```bash
+docker build -t ofood-backend .
+docker run -p 8080:8080 -e PORT=8080 -e SPRING_PROFILES_ACTIVE=dev -e DB_PASSWORD=your_db_password -e OFOOD_JWT_PRIVATE_KEY_PATH=/app/keys/dev-private.pem -v /absolute/path/to/keys:/app/keys ofood-backend
+```
