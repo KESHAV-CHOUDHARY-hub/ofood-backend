@@ -488,4 +488,35 @@ class AuthHttpIntegrationTest {
         assertThat(stored.getDeviceInfo().isTextual()).isTrue();
         assertThat(stored.getDeviceInfo().asText()).isEqualTo("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)");
     }
+
+    @Test
+    void shouldReturnMe() throws Exception {
+        String email = "me_test@example.com";
+        String password = "Password@123";
+        String firstName = "Keshav";
+        String lastName = "Choudhary";
+        
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + email + "\",\"password\":\"" + password + "\",\"firstName\":\"" + firstName + "\",\"lastName\":\"" + lastName + "\"}"))
+                .andExpect(status().isCreated());
+                
+        MvcResult result = mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + email + "\",\"password\":\"" + password + "\"}"))
+                .andExpect(status().isOk())
+                .andReturn();
+                
+        String jsonResponse = result.getResponse().getContentAsString();
+        String accessToken = objectMapper.readTree(jsonResponse).get("accessToken").asText();
+        
+        mockMvc.perform(get("/api/v1/auth/me")
+                        .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.email").value(email))
+                .andExpect(jsonPath("$.firstName").value(firstName))
+                .andExpect(jsonPath("$.lastName").value(lastName))
+                .andExpect(jsonPath("$.fullName").value(firstName + " " + lastName))
+                .andExpect(jsonPath("$.roles[0]").value("ROLE_CUSTOMER"));
+    }
 }

@@ -80,7 +80,17 @@ public class AuthService {
         User user = new User();
         user.setEmail(normalizedEmail);
         user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
-        user.setFullName(request.getFullName().trim());
+
+        if (request.getFullName() == null || request.getFullName().trim().isEmpty()) {
+            String fName = request.getFirstName() != null ? request.getFirstName().trim() : "";
+            String lName = request.getLastName() != null ? request.getLastName().trim() : "";
+            user.setFullName((fName + " " + lName).trim());
+        } else {
+            user.setFullName(request.getFullName().trim());
+        }
+        user.setFirstName(request.getFirstName());
+        user.setLastName(request.getLastName());
+        user.setMobile(request.getMobile());
         user.setStatus(ACTIVE_STATUS);
         Instant now = Instant.now();
         user.setCreatedAt(now);
@@ -212,6 +222,24 @@ public class AuthService {
         userRepository.save(user);
 
         refreshTokenRepository.revokeAllByUser(user, Instant.now());
+    }
+
+    @Transactional(readOnly = true)
+    public com.ofood.auth.dto.UserDto getMe(String principal) {
+        User user = findUserByPrincipal(principal);
+        com.ofood.auth.dto.UserDto dto = new com.ofood.auth.dto.UserDto();
+        dto.setId(user.getId());
+        dto.setEmail(user.getEmail());
+        dto.setFirstName(user.getFirstName());
+        dto.setLastName(user.getLastName());
+        dto.setFullName(user.getFullName());
+        dto.setMobile(user.getMobile());
+        dto.setAvatarUrl(user.getAvatarUrl());
+        dto.setIsActive("ACTIVE".equals(user.getStatus()));
+        dto.setCreatedAt(user.getCreatedAt());
+        dto.setUpdatedAt(user.getUpdatedAt());
+        dto.setRoles(user.getRoles().stream().map(Role::getName).toList());
+        return dto;
     }
 
     public AuthCookieProperties getCookieProperties() {

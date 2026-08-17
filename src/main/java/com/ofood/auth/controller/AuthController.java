@@ -103,6 +103,16 @@ public class AuthController {
         return ResponseEntity.ok().build();
     }
 
+    @Operation(summary = "Get current user profile", description = "Returns the currently authenticated user's profile details. Requires a valid Bearer JWT.")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponse(responseCode = "200", description = "Successfully retrieved user profile")
+    @ApiResponse(responseCode = "401", description = "Unauthorized (missing/invalid JWT)", content = @Content(schema = @Schema(implementation = com.ofood.auth.dto.ApiErrorResponse.class)))
+    @GetMapping("/me")
+    public ResponseEntity<com.ofood.auth.dto.UserDto> getMe(@Parameter(hidden = true) Authentication authentication) {
+        com.ofood.auth.dto.UserDto userDto = authService.getMe(authentication.getName());
+        return ResponseEntity.ok(userDto);
+    }
+
     private String readRefreshToken(HttpServletRequest request) {
         Cookie[] cookies = request.getCookies();
         if (cookies == null) {
