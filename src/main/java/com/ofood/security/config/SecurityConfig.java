@@ -86,6 +86,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/v1/cities", "/api/v1/cities/{id}").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/pincodes", "/api/v1/pincodes/{id}").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/serviceability").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/plans", "/api/v1/plans/{id}", "/api/v1/plans/slug/{slug}").permitAll()
                 .requestMatchers("/actuator/**").hasAuthority("ROLE_ADMIN")
                 .requestMatchers(HttpMethod.GET, "/.well-known/jwks.json").permitAll()
                 .requestMatchers(HttpMethod.GET, "/.well-known/openid-configuration").permitAll()
