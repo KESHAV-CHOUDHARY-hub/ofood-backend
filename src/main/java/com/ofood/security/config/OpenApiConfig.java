@@ -6,13 +6,16 @@ import io.swagger.v3.oas.annotations.info.Info;
 import io.swagger.v3.oas.annotations.security.SecurityScheme;
 import org.springframework.context.annotation.Configuration;
 
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+
 @Configuration
 @OpenAPIDefinition(
     info = @Info(
         title = "OFOOD Authentication API",
         version = "1.0",
         description = "API documentation for OFOOD Authentication and Authorization endpoints."
-    )
+    ),
+    security = @SecurityRequirement(name = "bearerAuth")
 )
 @SecurityScheme(
     name = "bearerAuth",
