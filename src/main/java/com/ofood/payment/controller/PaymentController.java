@@ -26,8 +26,15 @@ public class PaymentController {
     @PostMapping("/{id}/confirm")
     @Operation(summary = "Confirm a payment")
     public PaymentConfirmationResponse confirmPayment(@PathVariable UUID id,
-                                                      @Valid @RequestBody PaymentConfirmationRequest request,
-                                                      @AuthenticationPrincipal User customer) {
+                                                      @Valid @RequestBody PaymentConfirmationRequest request) {
+        org.springframework.security.core.Authentication authentication = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        User customer = null;
+        if (authentication != null && authentication.getPrincipal() instanceof org.springframework.security.oauth2.jwt.Jwt) {
+            org.springframework.security.oauth2.jwt.Jwt jwt = (org.springframework.security.oauth2.jwt.Jwt) authentication.getPrincipal();
+            UUID customerId = UUID.fromString(jwt.getSubject());
+            customer = new User();
+            customer.setId(customerId);
+        }
         return paymentService.confirmPayment(id, request, customer);
     }
 }

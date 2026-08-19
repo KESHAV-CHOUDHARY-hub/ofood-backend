@@ -118,13 +118,9 @@ public class CheckoutService {
     }
 
     private Address validateAddress(CheckoutPreviewRequest request, User customer) {
-        Address address = addressRepository.findById(request.getAddressId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Address not found"));
+        Address address = addressRepository.findByIdAndCustomerIdWithCity(request.getAddressId(), customer.getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "Address not found or does not belong to the authenticated user"));
 
-        if (!address.getCustomer().getId().equals(customer.getId())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Address does not belong to the authenticated user");
-        }
-        
         // TODO: Validate serviceability (e.g. check if city/pincode is active)
         // Currently relying on existing Address model which links to City. 
         if (address.getCity() != null && !"ACTIVE".equals(address.getCity().getStatus())) {

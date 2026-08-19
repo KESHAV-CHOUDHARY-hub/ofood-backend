@@ -13,3 +13,14 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+
+ofood:
+  security:
+    jwt:
+      issuer: http://localhost:8080
+      audience: ofood-api
+      key-id: test-kid
+      private-key-path: classpath:keys/test_private.pem
+  auth:
+    cookie:
+      secure: false

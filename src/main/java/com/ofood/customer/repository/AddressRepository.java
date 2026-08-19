@@ -22,4 +22,7 @@ public interface AddressRepository extends JpaRepository<Address, UUID> {
     @Modifying
     @Query("UPDATE Address a SET a.isDefault = false WHERE a.customer.id = :customerId AND a.isDefault = true")
     void clearDefaultAddressForCustomer(UUID customerId);
+
+    @Query("SELECT a FROM Address a JOIN FETCH a.city WHERE a.id = :addressId AND a.customer.id = :customerId")
+    Optional<Address> findByIdAndCustomerIdWithCity(UUID addressId, UUID customerId);
 }

@@ -18,6 +18,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.math.BigDecimal;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -46,13 +47,13 @@ class PricingEngineServiceTest {
 
         CheckoutPreviewResponse response = pricingEngineService.calculatePricing(plan, null);
 
-        assertEquals(new BigDecimal("1000.00"), response.getPlanPrice());
-        assertEquals(new BigDecimal("200.00"), response.getPlanDiscount());
-        assertEquals(new BigDecimal("0.00"), response.getVoucherDiscount());
-        assertEquals(new BigDecimal("1000.00"), response.getTaxableAmount());
-        assertEquals(new BigDecimal("50.00"), response.getTax()); // 5% of 1000
-        assertEquals(new BigDecimal("50.00"), response.getDeliveryFee());
-        assertEquals(new BigDecimal("1100.00"), response.getFinalAmount()); // 1000 + 50 + 50
+        assertThat(response.getPlanPrice()).isEqualByComparingTo(new BigDecimal("1000.00"));
+        assertThat(response.getPlanDiscount()).isEqualByComparingTo(new BigDecimal("200.00"));
+        assertThat(response.getVoucherDiscount()).isEqualByComparingTo(new BigDecimal("0.00"));
+        assertThat(response.getTaxableAmount()).isEqualByComparingTo(new BigDecimal("1000.00"));
+        assertThat(response.getTax()).isEqualByComparingTo(new BigDecimal("50.00")); // 5% of 1000
+        assertThat(response.getDeliveryFee()).isEqualByComparingTo(new BigDecimal("50.00"));
+        assertThat(response.getFinalAmount()).isEqualByComparingTo(new BigDecimal("1100.00")); // 1000 + 50 + 50
     }
 
     @Test
@@ -74,12 +75,12 @@ class PricingEngineServiceTest {
 
         CheckoutPreviewResponse response = pricingEngineService.calculatePricing(plan, voucher);
 
-        assertEquals(new BigDecimal("1000.00"), response.getPlanPrice());
-        assertEquals(new BigDecimal("0.00"), response.getPlanDiscount());
-        assertEquals(new BigDecimal("200.00"), response.getVoucherDiscount());
-        assertEquals(new BigDecimal("800.00"), response.getTaxableAmount()); // 1000 - 200
-        assertEquals(new BigDecimal("40.00"), response.getTax()); // 5% of 800
-        assertEquals(new BigDecimal("50.00"), response.getDeliveryFee());
-        assertEquals(new BigDecimal("890.00"), response.getFinalAmount()); // 800 + 40 + 50
+        assertThat(response.getPlanPrice()).isEqualByComparingTo(new BigDecimal("1000.00"));
+        assertThat(response.getPlanDiscount()).isEqualByComparingTo(new BigDecimal("0.00"));
+        assertThat(response.getVoucherDiscount()).isEqualByComparingTo(new BigDecimal("200.00"));
+        assertThat(response.getTaxableAmount()).isEqualByComparingTo(new BigDecimal("800.00")); // 1000 - 200
+        assertThat(response.getTax()).isEqualByComparingTo(new BigDecimal("40.00")); // 5% of 800
+        assertThat(response.getDeliveryFee()).isEqualByComparingTo(new BigDecimal("50.00"));
+        assertThat(response.getFinalAmount()).isEqualByComparingTo(new BigDecimal("890.00")); // 800 + 40 + 50
     }
 }

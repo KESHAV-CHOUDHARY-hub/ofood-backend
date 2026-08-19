@@ -8,4 +8,7 @@ public record ApiErrorResponse(
     @Schema(description = "Detailed error message", example = "Invalid email or password") String message, 
     @Schema(description = "Unique trace ID for debugging", example = "abc123xyz") String traceId
 ) {
+    public ApiErrorResponse(String code, String message) {
+        this(code, message, null);
+    }
 }

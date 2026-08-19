@@ -97,9 +97,9 @@ class AddressIntegrationTest {
         customer2Token = createUserAndLogin("c2@test.com", "ROLE_CUSTOMER");
 
         City city = new City();
-        city.setName("Bangalore");
-        city.setSlug("bangalore");
-        city.setState("Karnataka");
+        city.setName("Test City");
+        city.setSlug("test-city-" + java.util.UUID.randomUUID().toString());
+        city.setState("Test State");
         city.setStatus("ACTIVE");
         city = cityRepository.save(city);
 
@@ -153,7 +153,7 @@ class AddressIntegrationTest {
                         .content(req1))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.isDefault").value(true))
-                .andExpect(jsonPath("$.city").value("Bangalore"))
+                .andExpect(jsonPath("$.city").value("Test City"))
                 .andReturn();
                 
         String addr1Id = objectMapper.readTree(res1.getResponse().getContentAsString()).get("id").asText();

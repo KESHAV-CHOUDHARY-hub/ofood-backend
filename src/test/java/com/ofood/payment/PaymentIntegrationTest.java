@@ -13,6 +13,7 @@ import com.ofood.payment.dto.PaymentConfirmationRequest;
 import com.ofood.payment.model.Payment;
 import com.ofood.payment.model.PaymentStatus;
 import com.ofood.payment.repository.PaymentRepository;
+import com.ofood.payment.repository.PaymentTransactionRepository;
 import com.ofood.security.jwt.JwtTokenService;
 import com.ofood.role.Role;
 import com.ofood.subscription.model.Subscription;
@@ -60,6 +61,9 @@ public class PaymentIntegrationTest {
     private PaymentRepository paymentRepository;
 
     @Autowired
+    private PaymentTransactionRepository paymentTransactionRepository;
+
+    @Autowired
     private PasswordEncoder passwordEncoder;
 
     @Autowired
@@ -73,6 +77,7 @@ public class PaymentIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        paymentTransactionRepository.deleteAll();
         paymentRepository.deleteAll();
         subscriptionRepository.deleteAll();
         userRepository.deleteAll();
@@ -94,6 +99,8 @@ public class PaymentIntegrationTest {
 
         City city = new City();
         city.setName("Payment City");
+        city.setSlug("payment-city-" + java.util.UUID.randomUUID().toString());
+        city.setState("Test State");
         city.setStatus("ACTIVE");
         city = cityRepository.save(city);
 

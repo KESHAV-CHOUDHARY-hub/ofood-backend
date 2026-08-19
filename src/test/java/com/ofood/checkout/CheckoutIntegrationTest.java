@@ -48,6 +48,12 @@ public class CheckoutIntegrationTest {
     private CityRepository cityRepository;
 
     @Autowired
+    private com.ofood.payment.repository.PaymentRepository paymentRepository;
+
+    @Autowired
+    private com.ofood.subscription.repository.SubscriptionRepository subscriptionRepository;
+
+    @Autowired
     private PasswordEncoder passwordEncoder;
 
     @Autowired
@@ -56,12 +62,18 @@ public class CheckoutIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private com.ofood.payment.repository.PaymentTransactionRepository paymentTransactionRepository;
+
     private String customerToken;
     private Plan plan;
     private Address address;
 
     @BeforeEach
     void setUp() {
+        paymentTransactionRepository.deleteAll();
+        paymentRepository.deleteAll();
+        subscriptionRepository.deleteAll();
         userRepository.deleteAll();
         planRepository.deleteAll();
         addressRepository.deleteAll();
@@ -84,8 +96,17 @@ public class CheckoutIntegrationTest {
 
         City city = new City();
         city.setName("Checkout City");
+        city.setSlug("checkout-city-" + java.util.UUID.randomUUID().toString());
+        city.setState("Test State");
         city.setStatus("ACTIVE");
         city = cityRepository.save(city);
+
+        City inactiveCity = new City();
+        inactiveCity.setName("Inactive City");
+        inactiveCity.setSlug("inactive-city-" + java.util.UUID.randomUUID().toString());
+        inactiveCity.setState("Test State");
+        inactiveCity.setStatus("INACTIVE");
+        inactiveCity = cityRepository.save(inactiveCity);
 
         address = new Address();
         address.setCustomer(customer);

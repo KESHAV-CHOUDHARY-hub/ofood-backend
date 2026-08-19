@@ -27,17 +27,32 @@ public class SubscriptionController {
 
     @GetMapping
     @Operation(summary = "Get all subscriptions for the authenticated customer")
-    public List<Subscription> getSubscriptions(@AuthenticationPrincipal User customer) {
-        // Since we don't have a direct customerId method in repo right now, we can filter or add it.
-        // For phase 2C we will just rely on findAll filtering or a custom query.
+    public List<Subscription> getSubscriptions() {
+        org.springframework.security.core.Authentication authentication = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        User customer = null;
+        if (authentication != null && authentication.getPrincipal() instanceof org.springframework.security.oauth2.jwt.Jwt) {
+            org.springframework.security.oauth2.jwt.Jwt jwt = (org.springframework.security.oauth2.jwt.Jwt) authentication.getPrincipal();
+            UUID customerId = UUID.fromString(jwt.getSubject());
+            customer = new User();
+            customer.setId(customerId);
+        }
+        final User finalCustomer = customer;
         return subscriptionRepository.findAll().stream()
-                .filter(s -> s.getCustomer().getId().equals(customer.getId()))
+                .filter(s -> s.getCustomer().getId().equals(finalCustomer.getId()))
                 .collect(Collectors.toList());
     }
 
     @GetMapping("/{id}")
     @Operation(summary = "Get subscription by ID")
-    public Subscription getSubscription(@PathVariable UUID id, @AuthenticationPrincipal User customer) {
+    public Subscription getSubscription(@PathVariable UUID id) {
+        org.springframework.security.core.Authentication authentication = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        User customer = null;
+        if (authentication != null && authentication.getPrincipal() instanceof org.springframework.security.oauth2.jwt.Jwt) {
+            org.springframework.security.oauth2.jwt.Jwt jwt = (org.springframework.security.oauth2.jwt.Jwt) authentication.getPrincipal();
+            UUID customerId = UUID.fromString(jwt.getSubject());
+            customer = new User();
+            customer.setId(customerId);
+        }
         Subscription subscription = subscriptionRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Subscription not found"));
 

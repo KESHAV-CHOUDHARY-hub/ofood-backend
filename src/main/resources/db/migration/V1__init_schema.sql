@@ -61,9 +61,9 @@ CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id ON refresh_tokens(user_id)
 INSERT INTO roles (id, name, description)
 VALUES
   ('00000000-0000-0000-0000-000000000001'::uuid, 'ROLE_CUSTOMER', 'Default customer role')
-ON CONFLICT (name) DO NOTHING;
+ON CONFLICT DO NOTHING;
 
 INSERT INTO roles (id, name, description)
 VALUES
   ('00000000-0000-0000-0000-000000000002'::uuid, 'ROLE_ADMIN', 'Administrator role')
-ON CONFLICT (name) DO NOTHING;
+ON CONFLICT DO NOTHING;
