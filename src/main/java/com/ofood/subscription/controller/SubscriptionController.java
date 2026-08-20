@@ -1,6 +1,7 @@
 package com.ofood.subscription.controller;
 
 import com.ofood.auth.model.User;
+import com.ofood.subscription.dto.SubscriptionResponse;
 import com.ofood.subscription.model.Subscription;
 import com.ofood.subscription.repository.SubscriptionRepository;
 import io.swagger.v3.oas.annotations.Operation;
@@ -27,39 +28,58 @@ public class SubscriptionController {
 
     @GetMapping
     @Operation(summary = "Get all subscriptions for the authenticated customer")
-    public List<Subscription> getSubscriptions() {
+    public List<SubscriptionResponse> getSubscriptions() {
         org.springframework.security.core.Authentication authentication = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
-        User customer = null;
+        UUID customerId = null;
         if (authentication != null && authentication.getPrincipal() instanceof org.springframework.security.oauth2.jwt.Jwt) {
             org.springframework.security.oauth2.jwt.Jwt jwt = (org.springframework.security.oauth2.jwt.Jwt) authentication.getPrincipal();
-            UUID customerId = UUID.fromString(jwt.getSubject());
-            customer = new User();
-            customer.setId(customerId);
+            customerId = UUID.fromString(jwt.getSubject());
         }
-        final User finalCustomer = customer;
-        return subscriptionRepository.findAll().stream()
-                .filter(s -> s.getCustomer().getId().equals(finalCustomer.getId()))
+        if (customerId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not authenticated");
+        }
+        return subscriptionRepository.findByCustomerId(customerId).stream()
+                .map(this::toResponse)
                 .collect(Collectors.toList());
     }
 
     @GetMapping("/{id}")
     @Operation(summary = "Get subscription by ID")
-    public Subscription getSubscription(@PathVariable UUID id) {
+    public SubscriptionResponse getSubscription(@PathVariable UUID id) {
         org.springframework.security.core.Authentication authentication = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
-        User customer = null;
+        UUID customerId = null;
         if (authentication != null && authentication.getPrincipal() instanceof org.springframework.security.oauth2.jwt.Jwt) {
             org.springframework.security.oauth2.jwt.Jwt jwt = (org.springframework.security.oauth2.jwt.Jwt) authentication.getPrincipal();
-            UUID customerId = UUID.fromString(jwt.getSubject());
-            customer = new User();
-            customer.setId(customerId);
+            customerId = UUID.fromString(jwt.getSubject());
+        }
+        if (customerId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not authenticated");
         }
         Subscription subscription = subscriptionRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Subscription not found"));
 
-        if (!subscription.getCustomer().getId().equals(customer.getId())) {
+        if (!subscription.getCustomer().getId().equals(customerId)) {
              throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Subscription does not belong to the authenticated user");
         }
 
-        return subscription;
+        return toResponse(subscription);
+    }
+    
+    private SubscriptionResponse toResponse(Subscription subscription) {
+        SubscriptionResponse response = new SubscriptionResponse();
+        response.setId(subscription.getId());
+        response.setStatus(subscription.getStatus());
+        response.setPlanId(subscription.getPlan() != null ? subscription.getPlan().getId() : null);
+        response.setAddressId(subscription.getAddress() != null ? subscription.getAddress().getId() : null);
+        response.setStartDate(subscription.getStartDate());
+        response.setEndDate(subscription.getEndDate());
+        response.setPrice(subscription.getPrice());
+        response.setPlanDiscount(subscription.getPlanDiscount());
+        response.setVoucherDiscount(subscription.getVoucherDiscount());
+        response.setTax(subscription.getTax());
+        response.setDeliveryFee(subscription.getDeliveryFee());
+        response.setFinalAmount(subscription.getFinalAmount());
+        response.setCreatedAt(subscription.getCreatedAt());
+        return response;
     }
 }

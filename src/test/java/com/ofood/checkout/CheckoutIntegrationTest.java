@@ -74,10 +74,10 @@ public class CheckoutIntegrationTest {
         paymentTransactionRepository.deleteAll();
         paymentRepository.deleteAll();
         subscriptionRepository.deleteAll();
-        userRepository.deleteAll();
-        planRepository.deleteAll();
         addressRepository.deleteAll();
         cityRepository.deleteAll();
+        userRepository.deleteAll();
+        planRepository.deleteAll();
 
         Role role = new Role();
         role.setName("ROLE_CUSTOMER");
