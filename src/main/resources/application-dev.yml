@@ -1,8 +1,8 @@
 DB_HOST: localhost
 DB_PORT: 5432
-DB_NAME: ofood
+DB_NAME: ofood_local
 DB_USERNAME: ofood
-DB_PASSWORD: ofood_local
+DB_PASSWORD: ofood
 
 OFOOD_FRONTEND_URL: http://localhost:5173
 OFOOD_JWT_ISSUER: http://localhost:8080

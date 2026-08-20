@@ -59,6 +59,12 @@ public class GlobalExceptionHandler {
         return new ApiErrorResponse("VALIDATION_FAILED", message, org.slf4j.MDC.get("traceId"));
     }
 
+    @ExceptionHandler(org.springframework.http.converter.HttpMessageNotReadableException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiErrorResponse handleHttpMessageNotReadable(org.springframework.http.converter.HttpMessageNotReadableException ex) {
+        return new ApiErrorResponse("MALFORMED_JSON", "Malformed JSON request", org.slf4j.MDC.get("traceId"));
+    }
+
     @ExceptionHandler(ResponseStatusException.class)
     public org.springframework.http.ResponseEntity<ApiErrorResponse> handleResponseStatusException(ResponseStatusException ex) {
         return org.springframework.http.ResponseEntity.status(ex.getStatusCode())

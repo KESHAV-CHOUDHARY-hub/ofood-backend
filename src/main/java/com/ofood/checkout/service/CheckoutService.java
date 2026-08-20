@@ -46,6 +46,7 @@ public class CheckoutService {
         this.paymentProvider = paymentProvider;
     }
 
+    @Transactional(readOnly = true)
     public CheckoutPreviewResponse previewCheckout(CheckoutPreviewRequest request, User customer) {
         Plan plan = validatePlan(request);
         Address address = validateAddress(request, customer);

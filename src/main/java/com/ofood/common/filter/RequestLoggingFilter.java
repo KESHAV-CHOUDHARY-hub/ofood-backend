@@ -18,7 +18,7 @@ import java.io.IOException;
 import java.util.UUID;
 
 @Component
-@Order(Ordered.HIGHEST_PRECEDENCE)
+@Order(-99) // Run after Spring Security (which is typically -100)
 public class RequestLoggingFilter extends OncePerRequestFilter {
 
     private static final Logger log = LoggerFactory.getLogger(RequestLoggingFilter.class);
