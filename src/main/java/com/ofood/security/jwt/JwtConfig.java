@@ -33,9 +33,25 @@ public class JwtConfig {
             RSAKey rsaKey = keyProvider.getRsaKey();
             RSAPublicKey pub = rsaKey.toRSAPublicKey();
             NimbusJwtDecoder decoder = NimbusJwtDecoder.withPublicKey(pub).build();
-            OAuth2TokenValidator<Jwt> withIssuer = JwtValidators.createDefaultWithIssuer(properties.getIssuer());
+            
+            org.springframework.security.oauth2.jwt.JwtTimestampValidator defaultTimestampValidator = new org.springframework.security.oauth2.jwt.JwtTimestampValidator();
+            OAuth2TokenValidator<Jwt> customTimestampValidator = jwt -> {
+                org.springframework.security.oauth2.core.OAuth2TokenValidatorResult result = defaultTimestampValidator.validate(jwt);
+                if (result.hasErrors()) {
+                    return org.springframework.security.oauth2.core.OAuth2TokenValidatorResult.failure(
+                            new org.springframework.security.oauth2.core.OAuth2Error("expired_token", "Jwt is expired", null)
+                    );
+                }
+                return org.springframework.security.oauth2.core.OAuth2TokenValidatorResult.success();
+            };
+            
             OAuth2TokenValidator<Jwt> withAudience = new JwtClaimValidator<List<String>>("aud", aud -> aud != null && aud.contains(properties.getAudience()));
-            decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(withIssuer, withAudience));
+            
+            // We shouldn't use createDefaultWithIssuer if we want to override the timestamp validator entirely.
+            // Let's create the issuer validator directly.
+            OAuth2TokenValidator<Jwt> issuerValidator = new org.springframework.security.oauth2.jwt.JwtIssuerValidator(properties.getIssuer());
+            
+            decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(customTimestampValidator, issuerValidator, withAudience));
             return decoder;
         } catch (com.nimbusds.jose.JOSEException ex) {
             throw new IllegalStateException("Failed to build JwtDecoder from RSA key", ex);

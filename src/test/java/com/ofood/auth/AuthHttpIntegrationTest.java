@@ -30,7 +30,9 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -88,6 +90,12 @@ class AuthHttpIntegrationTest {
 
     @Autowired
     private JwtDecoder jwtDecoder;
+
+    @Autowired
+    private com.ofood.security.jwt.RsaKeyProvider keyProvider;
+
+    @Autowired
+    private com.ofood.security.jwt.RsaKeyProperties rsaKeyProperties;
 
     @BeforeEach
     void resetUsers() {
@@ -434,17 +442,63 @@ class AuthHttpIntegrationTest {
     }
 
     @Test
-    void unauthenticatedRequestReturnsStandardizedApiErrorResponse() throws Exception {
-        mockMvc.perform(post("/api/v1/auth/change-password")
-                        .header("Authorization", "Bearer invalid")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"currentPassword":"Password@123","newPassword":"NewPassword@123"}
-                                """))
+    void authMeWithoutTokenReturnsAuthenticationRequired() throws Exception {
+        mockMvc.perform(get("/api/v1/auth/me"))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"))
-                .andExpect(jsonPath("$.message").value("Invalid email or password"))
-                .andExpect(jsonPath("$.traceId").isNotEmpty());
+                .andExpect(jsonPath("$.code").value("AUTHENTICATION_REQUIRED"));
+    }
+
+    @Test
+    void authMeWithMalformedTokenReturnsAccessTokenInvalid() throws Exception {
+        mockMvc.perform(get("/api/v1/auth/me")
+                        .header("Authorization", "Bearer invalid-token"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("ACCESS_TOKEN_INVALID"));
+    }
+
+    @Test
+    void authMeWithTamperedTokenReturnsAccessTokenInvalid() throws Exception {
+        register("tamper@example.com", "Password@123", "Tamper User");
+        LoginResponse login = login("tamper@example.com", "Password@123");
+        
+        String tamperedToken = login.accessToken().substring(0, login.accessToken().length() - 5) + "abcde";
+        
+        mockMvc.perform(get("/api/v1/auth/me")
+                        .header("Authorization", "Bearer " + tamperedToken))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("ACCESS_TOKEN_INVALID"));
+    }
+
+    @Test
+    void authMeWithExpiredTokenReturnsAccessTokenExpired() throws Exception {
+        com.nimbusds.jose.jwk.RSAKey rsaKey = keyProvider.getRsaKey();
+        org.springframework.security.oauth2.jwt.JwtEncoder encoder = new org.springframework.security.oauth2.jwt.NimbusJwtEncoder(
+                new com.nimbusds.jose.jwk.source.ImmutableJWKSet<>(new com.nimbusds.jose.jwk.JWKSet(rsaKey)));
+        
+        Instant now = Instant.now().minusSeconds(3600); // 1 hour ago
+        Instant exp = now.plusSeconds(1800); // expired 30 mins ago
+        
+        org.springframework.security.oauth2.jwt.JwtClaimsSet claims = org.springframework.security.oauth2.jwt.JwtClaimsSet.builder()
+                .issuer(rsaKeyProperties.getIssuer())
+                .issuedAt(now)
+                .expiresAt(exp)
+                .subject(UUID.randomUUID().toString())
+                .id(UUID.randomUUID().toString())
+                .claim("roles", List.of("ROLE_CUSTOMER"))
+                .claim("sid", UUID.randomUUID().toString())
+                .audience(Collections.singletonList(rsaKeyProperties.getAudience()))
+                .build();
+                
+        org.springframework.security.oauth2.jwt.JwsHeader header = org.springframework.security.oauth2.jwt.JwsHeader.with(org.springframework.security.oauth2.jose.jws.SignatureAlgorithm.RS256)
+                .keyId(rsaKeyProperties.getKeyId())
+                .build();
+                
+        String expiredToken = encoder.encode(org.springframework.security.oauth2.jwt.JwtEncoderParameters.from(header, claims)).getTokenValue();
+        
+        mockMvc.perform(get("/api/v1/auth/me")
+                        .header("Authorization", "Bearer " + expiredToken))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("ACCESS_TOKEN_EXPIRED"));
     }
 
     @Test
