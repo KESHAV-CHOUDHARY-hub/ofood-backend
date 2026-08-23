@@ -36,28 +36,28 @@ public class Plan {
     @Column(columnDefinition = "jsonb")
     private JsonNode gallery;
 
-    @Column(nullable = false, precision = 10, scale = 2)
+    @Column(precision = 10, scale = 2)
     private BigDecimal price;
 
     @Column(name = "compare_at_price", precision = 10, scale = 2)
     private BigDecimal compareAtPrice;
 
-    @Column(nullable = false)
+    @Column
     private String currency = "INR";
 
-    @Column(nullable = false)
+    @Column
     private Integer duration;
 
-    @Column(name = "duration_unit", nullable = false)
+    @Column(name = "duration_unit")
     private String durationUnit;
 
-    @Column(name = "meal_count", nullable = false)
+    @Column(name = "meal_count")
     private Integer mealCount;
 
-    @Column(name = "meals_per_day", nullable = false)
+    @Column(name = "meals_per_day")
     private Integer mealsPerDay;
 
-    @Column(name = "servings_per_meal", nullable = false)
+    @Column(name = "servings_per_meal")
     private Integer servingsPerMeal;
 
     @JdbcTypeCode(SqlTypes.JSON)
@@ -75,6 +75,12 @@ public class Plan {
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
     private JsonNode nutrition;
+
+    private String caloriesLabel;
+    private String deliveryInformation;
+    private String terms;
+    private String seoTitle;
+    private String seoDescription;
 
     @Column(nullable = false)
     private String status = "DRAFT";
@@ -132,6 +138,16 @@ public class Plan {
     public void setIngredients(JsonNode ingredients) { this.ingredients = ingredients; }
     public JsonNode getNutrition() { return nutrition; }
     public void setNutrition(JsonNode nutrition) { this.nutrition = nutrition; }
+    public String getCaloriesLabel() { return caloriesLabel; }
+    public void setCaloriesLabel(String caloriesLabel) { this.caloriesLabel = caloriesLabel; }
+    public String getDeliveryInformation() { return deliveryInformation; }
+    public void setDeliveryInformation(String deliveryInformation) { this.deliveryInformation = deliveryInformation; }
+    public String getTerms() { return terms; }
+    public void setTerms(String terms) { this.terms = terms; }
+    public String getSeoTitle() { return seoTitle; }
+    public void setSeoTitle(String seoTitle) { this.seoTitle = seoTitle; }
+    public String getSeoDescription() { return seoDescription; }
+    public void setSeoDescription(String seoDescription) { this.seoDescription = seoDescription; }
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
     public Boolean getIsFeatured() { return isFeatured; }

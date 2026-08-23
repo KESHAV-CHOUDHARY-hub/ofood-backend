@@ -12,41 +12,25 @@ import java.util.List;
 
 public class PlanRequest {
 
-    @NotBlank(message = "Name is required")
     private String name;
-
-    @NotBlank(message = "Slug is required")
-    @Pattern(regexp = "^[a-z0-9-]+$", message = "Slug can only contain lowercase letters, numbers, and hyphens")
-    private String slug;
 
     private String shortDescription;
     private String description;
     private String image;
     private JsonNode gallery;
-
-    @NotNull(message = "Price is required")
     @DecimalMin(value = "0.0", inclusive = false, message = "Price must be greater than zero")
     private BigDecimal price;
 
     private BigDecimal compareAtPrice;
     private String currency = "INR";
-
-    @NotNull(message = "Duration is required")
     @Min(value = 1, message = "Duration must be at least 1")
     private Integer duration;
 
-    @NotBlank(message = "Duration unit is required")
-    private String durationUnit;
-
-    @NotNull(message = "Meal count is required")
+        private String durationUnit;
     @Min(value = 1, message = "Meal count must be at least 1")
     private Integer mealCount;
-
-    @NotNull(message = "Meals per day is required")
     @Min(value = 1, message = "Meals per day must be at least 1")
     private Integer mealsPerDay;
-
-    @NotNull(message = "Servings per meal is required")
     @Min(value = 1, message = "Servings per meal must be at least 1")
     private Integer servingsPerMeal;
 
@@ -54,6 +38,12 @@ public class PlanRequest {
     private JsonNode features;
     private JsonNode ingredients;
     private JsonNode nutrition;
+    private String caloriesLabel;
+    private String deliveryInformation;
+    private String terms;
+    private String seoTitle;
+    private String seoDescription;
+
     private String status = "DRAFT";
     private Boolean isFeatured = false;
     private Integer displayOrder = 0;
@@ -62,8 +52,6 @@ public class PlanRequest {
 
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
-    public String getSlug() { return slug; }
-    public void setSlug(String slug) { this.slug = slug; }
     public String getShortDescription() { return shortDescription; }
     public void setShortDescription(String shortDescription) { this.shortDescription = shortDescription; }
     public String getDescription() { return description; }
@@ -96,6 +84,17 @@ public class PlanRequest {
     public void setIngredients(JsonNode ingredients) { this.ingredients = ingredients; }
     public JsonNode getNutrition() { return nutrition; }
     public void setNutrition(JsonNode nutrition) { this.nutrition = nutrition; }
+    
+    public String getCaloriesLabel() { return caloriesLabel; }
+    public void setCaloriesLabel(String caloriesLabel) { this.caloriesLabel = caloriesLabel; }
+    public String getDeliveryInformation() { return deliveryInformation; }
+    public void setDeliveryInformation(String deliveryInformation) { this.deliveryInformation = deliveryInformation; }
+    public String getTerms() { return terms; }
+    public void setTerms(String terms) { this.terms = terms; }
+    public String getSeoTitle() { return seoTitle; }
+    public void setSeoTitle(String seoTitle) { this.seoTitle = seoTitle; }
+    public String getSeoDescription() { return seoDescription; }
+    public void setSeoDescription(String seoDescription) { this.seoDescription = seoDescription; }
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
     public Boolean getIsFeatured() { return isFeatured; }

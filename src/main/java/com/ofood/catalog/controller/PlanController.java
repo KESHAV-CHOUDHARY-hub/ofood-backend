@@ -58,7 +58,13 @@ public class PlanController {
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
-    public ResponseEntity<PlanResponse> updatePlan(@PathVariable UUID id, @Valid @RequestBody PlanRequest request) {
+    public ResponseEntity<PlanResponse> updatePlanPut(@PathVariable UUID id, @Valid @RequestBody PlanRequest request) {
+        return ResponseEntity.ok(planService.updatePlan(id, request));
+    }
+
+    @PatchMapping("/{id}")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    public ResponseEntity<PlanResponse> updatePlanPatch(@PathVariable UUID id, @Valid @RequestBody PlanRequest request) {
         return ResponseEntity.ok(planService.updatePlan(id, request));
     }
 

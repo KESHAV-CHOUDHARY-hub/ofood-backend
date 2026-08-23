@@ -26,6 +26,12 @@ public class PlanResponse {
     private JsonNode features;
     private JsonNode ingredients;
     private JsonNode nutrition;
+    private String caloriesLabel;
+    private String deliveryInformation;
+    private String terms;
+    private String seoTitle;
+    private String seoDescription;
+
     private String status;
     private Boolean isFeatured;
     private Integer displayOrder;
@@ -71,6 +77,17 @@ public class PlanResponse {
     public void setIngredients(JsonNode ingredients) { this.ingredients = ingredients; }
     public JsonNode getNutrition() { return nutrition; }
     public void setNutrition(JsonNode nutrition) { this.nutrition = nutrition; }
+    
+    public String getCaloriesLabel() { return caloriesLabel; }
+    public void setCaloriesLabel(String caloriesLabel) { this.caloriesLabel = caloriesLabel; }
+    public String getDeliveryInformation() { return deliveryInformation; }
+    public void setDeliveryInformation(String deliveryInformation) { this.deliveryInformation = deliveryInformation; }
+    public String getTerms() { return terms; }
+    public void setTerms(String terms) { this.terms = terms; }
+    public String getSeoTitle() { return seoTitle; }
+    public void setSeoTitle(String seoTitle) { this.seoTitle = seoTitle; }
+    public String getSeoDescription() { return seoDescription; }
+    public void setSeoDescription(String seoDescription) { this.seoDescription = seoDescription; }
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
     public Boolean getIsFeatured() { return isFeatured; }

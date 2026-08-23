@@ -11,6 +11,8 @@ import com.ofood.catalog.repository.PlanRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import com.fasterxml.jackson.databind.JsonNode;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -45,9 +47,9 @@ public class PlanService {
     @Transactional(readOnly = true)
     public PlanResponse getActivePlanById(UUID id) {
         Plan plan = planRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Plan not found"));
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND, "Plan not found"));
         if (!"ACTIVE".equals(plan.getStatus())) {
-            throw new IllegalArgumentException("Plan not found or inactive");
+            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND, "Plan not found");
         }
         return mapToResponse(plan);
     }
@@ -56,26 +58,36 @@ public class PlanService {
     public PlanResponse getPlanByIdForAdmin(UUID id) {
         return planRepository.findById(id)
                 .map(this::mapToResponse)
-                .orElseThrow(() -> new IllegalArgumentException("Plan not found"));
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND, "Plan not found"));
     }
 
     @Transactional(readOnly = true)
     public PlanResponse getActivePlanBySlug(String slug) {
         Plan plan = planRepository.findBySlug(slug)
-                .orElseThrow(() -> new IllegalArgumentException("Plan not found"));
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND, "Plan not found"));
         if (!"ACTIVE".equals(plan.getStatus())) {
-            throw new IllegalArgumentException("Plan not found or inactive");
+            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND, "Plan not found");
         }
         return mapToResponse(plan);
     }
 
     @Transactional
     public PlanResponse createPlan(PlanRequest request) {
-        if (planRepository.existsBySlug(request.getSlug())) {
-            throw new IllegalArgumentException("Plan slug already exists");
+        if (request.getName() == null || request.getName().trim().isEmpty()) {
+            throw new IllegalArgumentException("Name is required");
         }
+        
         Plan plan = new Plan();
+        plan.setStatus("DRAFT"); // Default
+        
+        // Initial slug so it's not null before updates
+        plan.setSlug(generateSlug(request.getName())); 
+        
         updatePlanFromRequest(plan, request);
+        
+        // Check activation and pricing rules against final state
+        validateFinalPlanState(plan);
+        
         plan = planRepository.save(plan);
         return mapToResponse(plan);
     }
@@ -83,14 +95,21 @@ public class PlanService {
     @Transactional
     public PlanResponse updatePlan(UUID id, PlanRequest request) {
         Plan plan = planRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Plan not found"));
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND, "Plan not found"));
 
-        if (!plan.getSlug().equals(request.getSlug()) && planRepository.existsBySlug(request.getSlug())) {
-            throw new IllegalArgumentException("Plan slug already exists");
+        if (request.getName() != null && !request.getName().equals(plan.getName())) {
+            plan.setSlug(generateSlug(request.getName()));
         }
         
-        plan.getMeals().clear(); // Let Hibernate manage orphan removal
+        if (request.getMeals() != null) {
+            plan.getMeals().clear();
+        }
+        
         updatePlanFromRequest(plan, request);
+        
+        // Check activation and pricing rules against final state
+        validateFinalPlanState(plan);
+        
         plan.setUpdatedAt(Instant.now());
 
         plan = planRepository.save(plan);
@@ -100,7 +119,7 @@ public class PlanService {
     @Transactional
     public void deletePlan(UUID id) {
         if (!planRepository.existsById(id)) {
-            throw new IllegalArgumentException("Plan not found");
+            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND, "Plan not found");
         }
         planRepository.deleteById(id);
     }
@@ -108,11 +127,11 @@ public class PlanService {
     @Transactional
     public PlanResponse duplicatePlan(UUID id) {
         Plan original = planRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Plan not found"));
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND, "Plan not found"));
 
         Plan duplicate = new Plan();
         duplicate.setName(original.getName() + " (Copy)");
-        duplicate.setSlug(original.getSlug() + "-copy-" + System.currentTimeMillis());
+        duplicate.setSlug(generateSlug(duplicate.getName()));
         duplicate.setShortDescription(original.getShortDescription());
         duplicate.setDescription(original.getDescription());
         duplicate.setImage(original.getImage());
@@ -174,25 +193,78 @@ public class PlanService {
         planRepository.saveAll(plans);
     }
 
+    
+    private String generateSlug(String name) {
+        if (name == null || name.trim().isEmpty()) {
+            return UUID.randomUUID().toString();
+        }
+        String baseSlug = name.toLowerCase().replaceAll("[^a-z0-9\\s-]", "").replaceAll("\\s+", "-");
+        // Remove trailing hyphens
+        baseSlug = baseSlug.replaceAll("-$", "");
+        if (baseSlug.isEmpty()) {
+            baseSlug = "plan";
+        }
+        String slug = baseSlug;
+        int counter = 2;
+        while (planRepository.existsBySlug(slug)) {
+            slug = baseSlug + "-" + counter;
+            counter++;
+        }
+        return slug;
+    }
+
+    private void validateFinalPlanState(Plan plan) {
+        // Pricing validation: compareAtPrice >= price
+        if (plan.getPrice() != null && plan.getCompareAtPrice() != null) {
+            if (plan.getCompareAtPrice().compareTo(plan.getPrice()) < 0) {
+                throw new IllegalArgumentException("compareAtPrice must be greater than or equal to price");
+            }
+        }
+
+        // Activation validation
+        if ("ACTIVE".equals(plan.getStatus())) {
+            List<String> missingFields = new ArrayList<>();
+
+            if (plan.getName() == null || plan.getName().trim().isEmpty()) missingFields.add("name");
+            if (plan.getPrice() == null) missingFields.add("price");
+            if (plan.getCurrency() == null || plan.getCurrency().trim().isEmpty()) missingFields.add("currency");
+            if (plan.getDuration() == null) missingFields.add("duration");
+            if (plan.getDurationUnit() == null || plan.getDurationUnit().trim().isEmpty()) missingFields.add("durationUnit");
+            if (plan.getMealCount() == null) missingFields.add("mealCount");
+            if (plan.getMealsPerDay() == null) missingFields.add("mealsPerDay");
+            if (plan.getServingsPerMeal() == null) missingFields.add("servingsPerMeal");
+            if (plan.getMealTypes() == null || plan.getMealTypes().isEmpty()) missingFields.add("mealTypes");
+
+            if (!missingFields.isEmpty()) {
+                throw new IllegalArgumentException("Cannot activate plan. Missing required fields: " + String.join(", ", missingFields));
+            }
+        }
+    }
     private void updatePlanFromRequest(Plan plan, PlanRequest request) {
-        plan.setName(request.getName());
-        plan.setSlug(request.getSlug());
-        plan.setShortDescription(request.getShortDescription());
-        plan.setDescription(request.getDescription());
-        plan.setImage(request.getImage());
-        plan.setGallery(request.getGallery());
-        plan.setPrice(request.getPrice());
-        plan.setCompareAtPrice(request.getCompareAtPrice());
+        if (request.getName() != null) plan.setName(request.getName());
+        if (request.getShortDescription() != null) plan.setShortDescription(request.getShortDescription());
+        if (request.getDescription() != null) plan.setDescription(request.getDescription());
+        if (request.getImage() != null) plan.setImage(request.getImage());
+        if (request.getGallery() != null) plan.setGallery(request.getGallery());
+        if (request.getPrice() != null) plan.setPrice(request.getPrice());
+        if (request.getCompareAtPrice() != null) plan.setCompareAtPrice(request.getCompareAtPrice());
         if (request.getCurrency() != null) plan.setCurrency(request.getCurrency());
-        plan.setDuration(request.getDuration());
-        plan.setDurationUnit(request.getDurationUnit());
-        plan.setMealCount(request.getMealCount());
-        plan.setMealsPerDay(request.getMealsPerDay());
-        plan.setServingsPerMeal(request.getServingsPerMeal());
-        plan.setMealTypes(request.getMealTypes());
-        plan.setFeatures(request.getFeatures());
-        plan.setIngredients(request.getIngredients());
-        plan.setNutrition(request.getNutrition());
+        if (request.getDuration() != null) plan.setDuration(request.getDuration());
+        if (request.getDurationUnit() != null) plan.setDurationUnit(request.getDurationUnit());
+        if (request.getMealCount() != null) plan.setMealCount(request.getMealCount());
+        if (request.getMealsPerDay() != null) plan.setMealsPerDay(request.getMealsPerDay());
+        if (request.getServingsPerMeal() != null) plan.setServingsPerMeal(request.getServingsPerMeal());
+        if (request.getMealTypes() != null) plan.setMealTypes(request.getMealTypes());
+        if (request.getFeatures() != null) plan.setFeatures(request.getFeatures());
+        if (request.getIngredients() != null) plan.setIngredients(request.getIngredients());
+        if (request.getNutrition() != null) plan.setNutrition(request.getNutrition());
+        
+        if (request.getCaloriesLabel() != null) plan.setCaloriesLabel(request.getCaloriesLabel());
+        if (request.getDeliveryInformation() != null) plan.setDeliveryInformation(request.getDeliveryInformation());
+        if (request.getTerms() != null) plan.setTerms(request.getTerms());
+        if (request.getSeoTitle() != null) plan.setSeoTitle(request.getSeoTitle());
+        if (request.getSeoDescription() != null) plan.setSeoDescription(request.getSeoDescription());
+
         if (request.getStatus() != null) plan.setStatus(request.getStatus());
         if (request.getIsFeatured() != null) plan.setIsFeatured(request.getIsFeatured());
         if (request.getDisplayOrder() != null) plan.setDisplayOrder(request.getDisplayOrder());
@@ -236,6 +308,11 @@ public class PlanService {
         response.setFeatures(plan.getFeatures());
         response.setIngredients(plan.getIngredients());
         response.setNutrition(plan.getNutrition());
+        response.setCaloriesLabel(plan.getCaloriesLabel());
+        response.setDeliveryInformation(plan.getDeliveryInformation());
+        response.setTerms(plan.getTerms());
+        response.setSeoTitle(plan.getSeoTitle());
+        response.setSeoDescription(plan.getSeoDescription());
         response.setStatus(plan.getStatus());
         response.setIsFeatured(plan.getIsFeatured());
         response.setDisplayOrder(plan.getDisplayOrder());

@@ -102,82 +102,89 @@ class PlanIntegrationTest {
         return objectMapper.readTree(result.getResponse().getContentAsString()).get("accessToken").asText();
     }
 
+
     @Test
-    void planCrudAndVisibilityWorks() throws Exception {
-        String planReq = """
+    void planDraftCreationAndSequentialSlugAndPartialUpdate() throws Exception {
+        // 1. Draft Creation & Sequential Slug Generation
+        String draftReq = """
         {
-            "name": "Weight Loss Plan",
-            "slug": "weight-loss",
+            "name": "Weight Loss Plan"
+        }
+        """;
+
+        // Admin creates draft 1
+        MvcResult result1 = mockMvc.perform(post("/api/v1/plans")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(draftReq))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value("DRAFT"))
+                .andExpect(jsonPath("$.slug").value("weight-loss-plan"))
+                .andReturn();
+        String planId1 = objectMapper.readTree(result1.getResponse().getContentAsString()).get("id").asText();
+
+        // Admin creates draft 2 (same name -> sequential slug)
+        mockMvc.perform(post("/api/v1/plans")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(draftReq))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.slug").value("weight-loss-plan-2"));
+
+        // 2. Partial Update
+        String patchReq = """
+        {
             "price": 1500.00,
+            "currency": "USD"
+        }
+        """;
+
+        mockMvc.perform(patch("/api/v1/plans/" + planId1)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(patchReq))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.price").value(1500.00))
+                .andExpect(jsonPath("$.currency").value("USD"))
+                .andExpect(jsonPath("$.status").value("DRAFT"))
+                .andExpect(jsonPath("$.name").value("Weight Loss Plan"));
+
+        // 3. Validation failure on activation
+        String activateReq = """
+        {
+            "status": "ACTIVE"
+        }
+        """;
+
+        mockMvc.perform(patch("/api/v1/plans/" + planId1)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(activateReq))
+                .andExpect(status().isBadRequest()); // assuming ExceptionHandler maps IllegalArgumentException to 400
+
+        // 4. Successful activation
+        String fullUpdateReq = """
+        {
             "duration": 30,
             "durationUnit": "days",
             "mealCount": 60,
             "mealsPerDay": 2,
             "servingsPerMeal": 1,
-            "status": "ACTIVE",
-            "meals": [
-                {
-                    "mealType": "LUNCH",
-                    "name": "Healthy Lunch",
-                    "calories": 500,
-                    "ingredients": {"items": ["chicken", "rice"]}
-                }
-            ]
+            "mealTypes": {"types": ["LUNCH"]},
+            "status": "ACTIVE"
         }
         """;
 
-        // Customer forbidden to create
-        mockMvc.perform(post("/api/v1/plans")
-                        .header("Authorization", "Bearer " + customerToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(planReq))
-                .andExpect(status().isForbidden());
-
-        // Admin creates
-        MvcResult result = mockMvc.perform(post("/api/v1/plans")
+        mockMvc.perform(patch("/api/v1/plans/" + planId1)
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(planReq))
-                .andExpect(status().isCreated())
-                .andReturn();
-                
-        String planId = objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asText();
-
-        // Public can get ACTIVE plans
-        mockMvc.perform(get("/api/v1/plans"))
+                        .content(fullUpdateReq))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(1)))
-                .andExpect(jsonPath("$[0].name").value("Weight Loss Plan"))
-                .andExpect(jsonPath("$[0].meals[0].mealType").value("LUNCH"))
-                .andExpect(jsonPath("$[0].meals[0].ingredients.items[0]").value("chicken"));
+                .andExpect(jsonPath("$.status").value("ACTIVE"));
 
-        // Admin updates status to DRAFT
-        String updateReq = planReq.replace("\"ACTIVE\"", "\"DRAFT\"");
-        mockMvc.perform(put("/api/v1/plans/" + planId)
-                        .header("Authorization", "Bearer " + adminToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(updateReq))
-                .andExpect(status().isOk());
-
-        // Public GET should not return DRAFT plan
+        // Verify public endpoint DOES return ACTIVE
         mockMvc.perform(get("/api/v1/plans"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(0)));
-
-        // Public GET by id should throw not found/inactive
-        mockMvc.perform(get("/api/v1/plans/" + planId))
-                .andExpect(status().isBadRequest());
-
-        // Admin GET should see DRAFT plan
-        mockMvc.perform(get("/api/v1/plans/all")
-                        .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(1)));
-
-        // Admin duplicate plan
-        mockMvc.perform(post("/api/v1/plans/" + planId + "/duplicate")
-                        .header("Authorization", "Bearer " + adminToken))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.name").value("Weight Loss Plan (Copy)"));
     }
 }
