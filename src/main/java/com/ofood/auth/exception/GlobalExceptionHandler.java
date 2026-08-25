@@ -56,7 +56,13 @@ public class GlobalExceptionHandler {
         String message = ex.getBindingResult().getFieldErrors().stream()
                 .map(err -> err.getField() + " " + err.getDefaultMessage())
                 .collect(Collectors.joining(", "));
-        return new ApiErrorResponse("VALIDATION_FAILED", message, org.slf4j.MDC.get("traceId"));
+        return new ApiErrorResponse("VALIDATION_FAILED", message, null, org.slf4j.MDC.get("traceId"));
+    }
+
+    @ExceptionHandler(com.ofood.catalog.exception.CatalogValidationException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiErrorResponse handleCatalogValidation(com.ofood.catalog.exception.CatalogValidationException ex) {
+        return new ApiErrorResponse("VALIDATION_FAILED", ex.getMessage(), ex.getErrors(), org.slf4j.MDC.get("traceId"));
     }
 
     @ExceptionHandler(org.springframework.http.converter.HttpMessageNotReadableException.class)

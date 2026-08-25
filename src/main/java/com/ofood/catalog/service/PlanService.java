@@ -1,10 +1,13 @@
 package com.ofood.catalog.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ofood.catalog.dto.PlanMealRequest;
 import com.ofood.catalog.dto.PlanMealResponse;
 import com.ofood.catalog.dto.PlanRequest;
 import com.ofood.catalog.dto.PlanResponse;
 import com.ofood.catalog.dto.ReorderPlansRequest;
+import com.ofood.catalog.exception.CatalogValidationException;
 import com.ofood.catalog.model.Plan;
 import com.ofood.catalog.model.PlanMeal;
 import com.ofood.catalog.repository.PlanRepository;
@@ -12,11 +15,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import com.fasterxml.jackson.databind.JsonNode;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -25,9 +28,11 @@ import java.util.stream.Collectors;
 public class PlanService {
 
     private final PlanRepository planRepository;
+    private final ObjectMapper objectMapper;
 
-    public PlanService(PlanRepository planRepository) {
+    public PlanService(PlanRepository planRepository, ObjectMapper objectMapper) {
         this.planRepository = planRepository;
+        this.objectMapper = objectMapper;
     }
 
     @Transactional(readOnly = true)
@@ -73,19 +78,18 @@ public class PlanService {
 
     @Transactional
     public PlanResponse createPlan(PlanRequest request) {
-        if (request.getName() == null || request.getName().trim().isEmpty()) {
-            throw new IllegalArgumentException("Name is required");
+        // Enforce name on create
+        if (request.getName() == null || request.getName().isEmpty() || request.getName().get() == null || request.getName().get().trim().isEmpty()) {
+            throw new CatalogValidationException("Validation failed", List.of("name is required for creating a plan"));
         }
         
         Plan plan = new Plan();
         plan.setStatus("DRAFT"); // Default
-        
-        // Initial slug so it's not null before updates
-        plan.setSlug(generateSlug(request.getName())); 
+        String name = request.getName().get();
+        plan.setName(name);
+        plan.setSlug(generateSlug(name));
         
         updatePlanFromRequest(plan, request);
-        
-        // Check activation and pricing rules against final state
         validateFinalPlanState(plan);
         
         plan = planRepository.save(plan);
@@ -97,21 +101,21 @@ public class PlanService {
         Plan plan = planRepository.findById(id)
                 .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND, "Plan not found"));
 
-        if (request.getName() != null && !request.getName().equals(plan.getName())) {
-            plan.setSlug(generateSlug(request.getName()));
-        }
-        
-        if (request.getMeals() != null) {
-            plan.getMeals().clear();
+        if (request.getName() != null) {
+            String newName = request.getName().orElse(null);
+            if (newName == null || newName.trim().isEmpty()) {
+                throw new CatalogValidationException("Validation failed", List.of("name cannot be null or blank"));
+            }
+            if (!newName.equals(plan.getName())) {
+                plan.setName(newName);
+                plan.setSlug(generateSlug(newName));
+            }
         }
         
         updatePlanFromRequest(plan, request);
-        
-        // Check activation and pricing rules against final state
         validateFinalPlanState(plan);
         
         plan.setUpdatedAt(Instant.now());
-
         plan = planRepository.save(plan);
         return mapToResponse(plan);
     }
@@ -167,6 +171,7 @@ public class PlanService {
             duplicate.getMeals().add(dm);
         }
 
+        validateFinalPlanState(duplicate);
         duplicate = planRepository.save(duplicate);
         return mapToResponse(duplicate);
     }
@@ -192,14 +197,12 @@ public class PlanService {
         }
         planRepository.saveAll(plans);
     }
-
     
     private String generateSlug(String name) {
         if (name == null || name.trim().isEmpty()) {
             return UUID.randomUUID().toString();
         }
         String baseSlug = name.toLowerCase().replaceAll("[^a-z0-9\\s-]", "").replaceAll("\\s+", "-");
-        // Remove trailing hyphens
         baseSlug = baseSlug.replaceAll("-$", "");
         if (baseSlug.isEmpty()) {
             baseSlug = "plan";
@@ -214,77 +217,119 @@ public class PlanService {
     }
 
     private void validateFinalPlanState(Plan plan) {
-        // Pricing validation: compareAtPrice >= price
+        List<String> errors = new ArrayList<>();
+
+        // Normal numeric/business validation
+        if (plan.getPrice() != null && plan.getPrice().compareTo(BigDecimal.ZERO) <= 0) {
+            errors.add("Price must be greater than zero");
+        }
+        if (plan.getCompareAtPrice() != null && plan.getCompareAtPrice().compareTo(BigDecimal.ZERO) < 0) {
+            errors.add("Compare at price must be zero or positive");
+        }
         if (plan.getPrice() != null && plan.getCompareAtPrice() != null) {
             if (plan.getCompareAtPrice().compareTo(plan.getPrice()) < 0) {
-                throw new IllegalArgumentException("compareAtPrice must be greater than or equal to price");
+                errors.add("compareAtPrice must be greater than or equal to price");
             }
+        }
+        if (plan.getDuration() != null && plan.getDuration() < 1) {
+            errors.add("Duration must be at least 1");
+        }
+        if (plan.getMealCount() != null && plan.getMealCount() < 1) {
+            errors.add("Meal count must be at least 1");
+        }
+        if (plan.getMealsPerDay() != null && plan.getMealsPerDay() < 1) {
+            errors.add("Meals per day must be at least 1");
+        }
+        if (plan.getServingsPerMeal() != null && plan.getServingsPerMeal() < 1) {
+            errors.add("Servings per meal must be at least 1");
+        }
+        if (plan.getDisplayOrder() != null && plan.getDisplayOrder() < 0) {
+            errors.add("Display order must be zero or positive");
         }
 
         // Activation validation
         if ("ACTIVE".equals(plan.getStatus())) {
-            List<String> missingFields = new ArrayList<>();
+            if (plan.getName() == null || plan.getName().trim().isEmpty()) errors.add("name is required for ACTIVE plan");
+            if (plan.getPrice() == null) errors.add("price is required for ACTIVE plan");
+            if (plan.getCurrency() == null || plan.getCurrency().trim().isEmpty()) errors.add("currency is required for ACTIVE plan");
+            if (plan.getDuration() == null) errors.add("duration is required for ACTIVE plan");
+            if (plan.getDurationUnit() == null || plan.getDurationUnit().trim().isEmpty()) errors.add("durationUnit is required for ACTIVE plan");
+            if (plan.getMealCount() == null) errors.add("mealCount is required for ACTIVE plan");
+            if (plan.getMealsPerDay() == null) errors.add("mealsPerDay is required for ACTIVE plan");
+            if (plan.getServingsPerMeal() == null) errors.add("servingsPerMeal is required for ACTIVE plan");
+            if (plan.getMealTypes() == null || plan.getMealTypes().isEmpty() || (plan.getMealTypes().isArray() && plan.getMealTypes().size() == 0)) {
+                errors.add("mealTypes is required for ACTIVE plan");
+            }
+        }
 
-            if (plan.getName() == null || plan.getName().trim().isEmpty()) missingFields.add("name");
-            if (plan.getPrice() == null) missingFields.add("price");
-            if (plan.getCurrency() == null || plan.getCurrency().trim().isEmpty()) missingFields.add("currency");
-            if (plan.getDuration() == null) missingFields.add("duration");
-            if (plan.getDurationUnit() == null || plan.getDurationUnit().trim().isEmpty()) missingFields.add("durationUnit");
-            if (plan.getMealCount() == null) missingFields.add("mealCount");
-            if (plan.getMealsPerDay() == null) missingFields.add("mealsPerDay");
-            if (plan.getServingsPerMeal() == null) missingFields.add("servingsPerMeal");
-            if (plan.getMealTypes() == null || plan.getMealTypes().isEmpty()) missingFields.add("mealTypes");
+        if (!errors.isEmpty()) {
+            throw new CatalogValidationException("Plan validation failed", errors);
+        }
+    }
 
-            if (!missingFields.isEmpty()) {
-                throw new IllegalArgumentException("Cannot activate plan. Missing required fields: " + String.join(", ", missingFields));
+    private void updatePlanFromRequest(Plan plan, PlanRequest request) {
+        // Name is handled in createPlan / updatePlan directly
+        if (request.getShortDescription() != null) plan.setShortDescription(request.getShortDescription().orElse(null));
+        if (request.getDescription() != null) plan.setDescription(request.getDescription().orElse(null));
+        if (request.getImage() != null) plan.setImage(request.getImage().orElse(null));
+        if (request.getPrice() != null) plan.setPrice(request.getPrice().orElse(null));
+        if (request.getCompareAtPrice() != null) plan.setCompareAtPrice(request.getCompareAtPrice().orElse(null));
+        if (request.getCurrency() != null) plan.setCurrency(request.getCurrency().orElse(null));
+        if (request.getDuration() != null) plan.setDuration(request.getDuration().orElse(null));
+        if (request.getDurationUnit() != null) plan.setDurationUnit(request.getDurationUnit().orElse(null));
+        if (request.getMealCount() != null) plan.setMealCount(request.getMealCount().orElse(null));
+        if (request.getMealsPerDay() != null) plan.setMealsPerDay(request.getMealsPerDay().orElse(null));
+        if (request.getServingsPerMeal() != null) plan.setServingsPerMeal(request.getServingsPerMeal().orElse(null));
+        if (request.getCaloriesLabel() != null) plan.setCaloriesLabel(request.getCaloriesLabel().orElse(null));
+        if (request.getDeliveryInformation() != null) plan.setDeliveryInformation(request.getDeliveryInformation().orElse(null));
+        if (request.getTerms() != null) plan.setTerms(request.getTerms().orElse(null));
+        if (request.getSeoTitle() != null) plan.setSeoTitle(request.getSeoTitle().orElse(null));
+        if (request.getSeoDescription() != null) plan.setSeoDescription(request.getSeoDescription().orElse(null));
+        if (request.getStatus() != null) plan.setStatus(request.getStatus().orElse("DRAFT"));
+        if (request.getIsFeatured() != null) plan.setIsFeatured(request.getIsFeatured().orElse(false));
+        if (request.getDisplayOrder() != null) plan.setDisplayOrder(request.getDisplayOrder().orElse(0));
+
+        // Collection handling
+        if (request.getGallery() != null) plan.setGallery(handleJsonCollection(request.getGallery()));
+        if (request.getMealTypes() != null) plan.setMealTypes(handleJsonCollection(request.getMealTypes()));
+        if (request.getFeatures() != null) plan.setFeatures(handleJsonCollection(request.getFeatures()));
+        if (request.getIngredients() != null) plan.setIngredients(handleJsonCollection(request.getIngredients()));
+        if (request.getNutrition() != null) plan.setNutrition(handleJsonCollection(request.getNutrition()));
+
+        if (request.getMeals() != null) {
+            Optional<List<PlanMealRequest>> mealsOpt = request.getMeals();
+            plan.getMeals().clear();
+            if (mealsOpt.isPresent() && mealsOpt.get() != null) {
+                for (PlanMealRequest mealReq : mealsOpt.get()) {
+                    PlanMeal meal = new PlanMeal();
+                    meal.setPlan(plan);
+                    meal.setMealType(mealReq.getMealType());
+                    meal.setName(mealReq.getName());
+                    meal.setDescription(mealReq.getDescription());
+                    meal.setCalories(mealReq.getCalories());
+                    meal.setServingSize(mealReq.getServingSize());
+                    meal.setIngredients(mealReq.getIngredients());
+                    meal.setNutrition(mealReq.getNutrition());
+                    meal.setImageUrl(mealReq.getImageUrl());
+                    meal.setDisplayOrder(mealReq.getDisplayOrder() != null ? mealReq.getDisplayOrder() : 0);
+                    plan.getMeals().add(meal);
+                }
             }
         }
     }
-    private void updatePlanFromRequest(Plan plan, PlanRequest request) {
-        if (request.getName() != null) plan.setName(request.getName());
-        if (request.getShortDescription() != null) plan.setShortDescription(request.getShortDescription());
-        if (request.getDescription() != null) plan.setDescription(request.getDescription());
-        if (request.getImage() != null) plan.setImage(request.getImage());
-        if (request.getGallery() != null) plan.setGallery(request.getGallery());
-        if (request.getPrice() != null) plan.setPrice(request.getPrice());
-        if (request.getCompareAtPrice() != null) plan.setCompareAtPrice(request.getCompareAtPrice());
-        if (request.getCurrency() != null) plan.setCurrency(request.getCurrency());
-        if (request.getDuration() != null) plan.setDuration(request.getDuration());
-        if (request.getDurationUnit() != null) plan.setDurationUnit(request.getDurationUnit());
-        if (request.getMealCount() != null) plan.setMealCount(request.getMealCount());
-        if (request.getMealsPerDay() != null) plan.setMealsPerDay(request.getMealsPerDay());
-        if (request.getServingsPerMeal() != null) plan.setServingsPerMeal(request.getServingsPerMeal());
-        if (request.getMealTypes() != null) plan.setMealTypes(request.getMealTypes());
-        if (request.getFeatures() != null) plan.setFeatures(request.getFeatures());
-        if (request.getIngredients() != null) plan.setIngredients(request.getIngredients());
-        if (request.getNutrition() != null) plan.setNutrition(request.getNutrition());
-        
-        if (request.getCaloriesLabel() != null) plan.setCaloriesLabel(request.getCaloriesLabel());
-        if (request.getDeliveryInformation() != null) plan.setDeliveryInformation(request.getDeliveryInformation());
-        if (request.getTerms() != null) plan.setTerms(request.getTerms());
-        if (request.getSeoTitle() != null) plan.setSeoTitle(request.getSeoTitle());
-        if (request.getSeoDescription() != null) plan.setSeoDescription(request.getSeoDescription());
 
-        if (request.getStatus() != null) plan.setStatus(request.getStatus());
-        if (request.getIsFeatured() != null) plan.setIsFeatured(request.getIsFeatured());
-        if (request.getDisplayOrder() != null) plan.setDisplayOrder(request.getDisplayOrder());
-
-        if (request.getMeals() != null) {
-            for (PlanMealRequest mealReq : request.getMeals()) {
-                PlanMeal meal = new PlanMeal();
-                meal.setPlan(plan);
-                meal.setMealType(mealReq.getMealType());
-                meal.setName(mealReq.getName());
-                meal.setDescription(mealReq.getDescription());
-                meal.setCalories(mealReq.getCalories());
-                meal.setServingSize(mealReq.getServingSize());
-                meal.setIngredients(mealReq.getIngredients());
-                meal.setNutrition(mealReq.getNutrition());
-                meal.setImageUrl(mealReq.getImageUrl());
-                meal.setDisplayOrder(mealReq.getDisplayOrder() != null ? mealReq.getDisplayOrder() : 0);
-                plan.getMeals().add(meal);
-            }
+    private JsonNode handleJsonCollection(Optional<JsonNode> optionalNode) {
+        if (!optionalNode.isPresent()) {
+            return null; // Explicit null -> set column to null
         }
+        JsonNode node = optionalNode.get();
+        if (node == null) {
+            return null; // Safety check
+        }
+        if (node.isArray() && node.isEmpty()) {
+            return objectMapper.createArrayNode(); // Explicit [] -> empty array
+        }
+        return node; // Supplied values -> replace
     }
 
     private PlanResponse mapToResponse(Plan plan) {

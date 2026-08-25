@@ -102,8 +102,27 @@ If a regular customer (without `ROLE_ADMIN`) attempts to access these APIs, the 
 
 #### 2. Update a Plan
 * **Purpose:** Edit an existing plan, such as changing pricing or meals.
-* **Endpoint:** `PUT /api/v1/plans/{id}`
+* **Endpoint:** `PUT /api/v1/plans/{id}` or `PATCH /api/v1/plans/{id}`
 * **Request Payload:** Same as Create Plan. Overwrites the existing plan data and meal mappings.
+
+#### 2a. Complete a draft (Activate)
+* **Purpose:** Activate a DRAFT plan so it becomes visible to customers.
+* **Endpoint:** `PATCH /api/v1/plans/{id}`
+* **Request Payload:** All activation-required fields must be supplied.
+  ```json
+  {
+    "status": "ACTIVE",
+    "price": 5000.00,
+    "currency": "INR",
+    "duration": 7,
+    "durationUnit": "DAYS",
+    "mealCount": 14,
+    "mealsPerDay": 2,
+    "servingsPerMeal": 1,
+    "mealTypes": ["LUNCH", "DINNER"]
+  }
+  ```
+  **Business Logic:** Backend will validate that the final state of the plan has all mandatory fields for activation (name, price, currency, duration, durationUnit, mealCount, mealsPerDay, servingsPerMeal, mealTypes). If any are missing, it throws `400 VALIDATION_FAILED` with a list of missing fields.
 
 #### 3. Duplicate a Plan
 * **Purpose:** Clone a complex plan instead of building it from scratch.

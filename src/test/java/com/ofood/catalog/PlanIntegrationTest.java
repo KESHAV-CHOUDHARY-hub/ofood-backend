@@ -102,89 +102,360 @@ class PlanIntegrationTest {
         return objectMapper.readTree(result.getResponse().getContentAsString()).get("accessToken").asText();
     }
 
-
-    @Test
-    void planDraftCreationAndSequentialSlugAndPartialUpdate() throws Exception {
-        // 1. Draft Creation & Sequential Slug Generation
+    private String createBaseDraft() throws Exception {
         String draftReq = """
         {
-            "name": "Weight Loss Plan"
+            "name": "Base Plan"
         }
         """;
-
-        // Admin creates draft 1
-        MvcResult result1 = mockMvc.perform(post("/api/v1/plans")
+        MvcResult result = mockMvc.perform(post("/api/v1/plans")
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(draftReq))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.status").value("DRAFT"))
-                .andExpect(jsonPath("$.slug").value("weight-loss-plan"))
                 .andReturn();
-        String planId1 = objectMapper.readTree(result1.getResponse().getContentAsString()).get("id").asText();
-
-        // Admin creates draft 2 (same name -> sequential slug)
-        mockMvc.perform(post("/api/v1/plans")
-                        .header("Authorization", "Bearer " + adminToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(draftReq))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.slug").value("weight-loss-plan-2"));
-
-        // 2. Partial Update
-        String patchReq = """
-        {
-            "price": 1500.00,
-            "currency": "USD"
-        }
-        """;
-
-        mockMvc.perform(patch("/api/v1/plans/" + planId1)
-                        .header("Authorization", "Bearer " + adminToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(patchReq))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.price").value(1500.00))
-                .andExpect(jsonPath("$.currency").value("USD"))
-                .andExpect(jsonPath("$.status").value("DRAFT"))
-                .andExpect(jsonPath("$.name").value("Weight Loss Plan"));
-
-        // 3. Validation failure on activation
-        String activateReq = """
-        {
-            "status": "ACTIVE"
-        }
-        """;
-
-        mockMvc.perform(patch("/api/v1/plans/" + planId1)
-                        .header("Authorization", "Bearer " + adminToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(activateReq))
-                .andExpect(status().isBadRequest()); // assuming ExceptionHandler maps IllegalArgumentException to 400
-
-        // 4. Successful activation
+        return objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asText();
+    }
+    
+    private String createActivePlan() throws Exception {
+        String id = createBaseDraft();
         String fullUpdateReq = """
         {
+            "price": 250,
+            "currency": "INR",
             "duration": 30,
-            "durationUnit": "days",
-            "mealCount": 60,
-            "mealsPerDay": 2,
+            "durationUnit": "DAYS",
+            "mealCount": 90,
+            "mealsPerDay": 3,
             "servingsPerMeal": 1,
-            "mealTypes": {"types": ["LUNCH"]},
+            "mealTypes": ["BREAKFAST", "LUNCH", "DINNER"],
             "status": "ACTIVE"
         }
         """;
-
-        mockMvc.perform(patch("/api/v1/plans/" + planId1)
+        mockMvc.perform(patch("/api/v1/plans/" + id)
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(fullUpdateReq))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("ACTIVE"));
+                .andExpect(status().isOk());
+        return id;
+    }
 
-        // Verify public endpoint DOES return ACTIVE
-        mockMvc.perform(get("/api/v1/plans"))
+    @Test
+    void testPostWithoutNameRejected() throws Exception {
+        mockMvc.perform(post("/api/v1/plans")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+    }
+    
+    @Test
+    void testPostWithNullNameRejected() throws Exception {
+        mockMvc.perform(post("/api/v1/plans")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\": null}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void testPostWithEmptyNameRejected() throws Exception {
+        mockMvc.perform(post("/api/v1/plans")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\": \"   \"}"))
+                .andExpect(status().isBadRequest());
+    }
+    
+    @Test
+    void testPatchOmittedNamePreserved() throws Exception {
+        String id = createBaseDraft();
+        mockMvc.perform(patch("/api/v1/plans/" + id)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"price\": 100}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(1)));
+                .andExpect(jsonPath("$.name").value("Base Plan"));
+    }
+    
+    @Test
+    void testPatchNameWithValidValueUpdatesAndSlugRegenerated() throws Exception {
+        String id = createBaseDraft();
+        mockMvc.perform(patch("/api/v1/plans/" + id)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\": \"New Plan\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("New Plan"))
+                .andExpect(jsonPath("$.slug").value("new-plan"));
+    }
+    
+    @Test
+    void testPatchNameNullRejected() throws Exception {
+        String id = createBaseDraft();
+        mockMvc.perform(patch("/api/v1/plans/" + id)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\": null}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+    }
+    
+    @Test
+    void testPatchNameBlankRejected() throws Exception {
+        String id = createBaseDraft();
+        mockMvc.perform(patch("/api/v1/plans/" + id)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\": \"   \"}"))
+                .andExpect(status().isBadRequest());
+    }
+    
+    @Test
+    void testPatchOmittedPricePreserved() throws Exception {
+        String id = createActivePlan();
+        mockMvc.perform(patch("/api/v1/plans/" + id)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"duration\": 60}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.price").value(250.0))
+                .andExpect(jsonPath("$.duration").value(60));
+    }
+    
+    @Test
+    void testPatchValidPriceUpdated() throws Exception {
+        String id = createActivePlan();
+        mockMvc.perform(patch("/api/v1/plans/" + id)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"price\": 500}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.price").value(500.0));
+    }
+    
+    @Test
+    void testPatchPriceNullOnDraftCleared() throws Exception {
+        String id = createBaseDraft();
+        mockMvc.perform(patch("/api/v1/plans/" + id)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"price\": 100}")); // setup
+                        
+        mockMvc.perform(patch("/api/v1/plans/" + id)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"price\": null}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.price").isEmpty());
+    }
+    
+    @Test
+    void testPatchDurationNullOnDraftCleared() throws Exception {
+        String id = createBaseDraft();
+        mockMvc.perform(patch("/api/v1/plans/" + id)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"duration\": 30}")); // setup
+                        
+        mockMvc.perform(patch("/api/v1/plans/" + id)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"duration\": null}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.duration").isEmpty());
+    }
+    
+    @Test
+    void testPatchNullableStringNullCleared() throws Exception {
+        String id = createBaseDraft();
+        mockMvc.perform(patch("/api/v1/plans/" + id)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"description\": \"desc\"}"));
+                        
+        mockMvc.perform(patch("/api/v1/plans/" + id)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"description\": null}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.description").isEmpty());
+    }
+    
+    @Test
+    void testNegativePriceRejected() throws Exception {
+        String id = createBaseDraft();
+        mockMvc.perform(patch("/api/v1/plans/" + id)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"price\": -10}"))
+                .andExpect(status().isBadRequest());
+    }
+    
+    @Test
+    void testDurationZeroRejected() throws Exception {
+        String id = createBaseDraft();
+        mockMvc.perform(patch("/api/v1/plans/" + id)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"duration\": 0}"))
+                .andExpect(status().isBadRequest());
+    }
+    
+
+    @Test
+    void testOmittedCollectionPreserved() throws Exception {
+        String id = createBaseDraft();
+        mockMvc.perform(patch("/api/v1/plans/" + id)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"features\": [\"A\"]}"));
+                        
+        mockMvc.perform(patch("/api/v1/plans/" + id)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.features", hasSize(1)));
+    }
+    
+    @Test
+    void testCollectionEmptyArrayExplicitlyEmpty() throws Exception {
+        String id = createBaseDraft();
+        mockMvc.perform(patch("/api/v1/plans/" + id)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"features\": [\"A\"]}"));
+                        
+        mockMvc.perform(patch("/api/v1/plans/" + id)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"features\": []}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.features", hasSize(0)));
+    }
+    
+    @Test
+    void testCollectionNullExplicitlyNull() throws Exception {
+        String id = createBaseDraft();
+        mockMvc.perform(patch("/api/v1/plans/" + id)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"features\": [\"A\"]}"));
+                        
+        mockMvc.perform(patch("/api/v1/plans/" + id)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"features\": null}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.features").isEmpty());
+    }
+    
+    @Test
+    void testActiveClearRequiredFieldRemainingActiveRejected() throws Exception {
+        String id = createActivePlan();
+        mockMvc.perform(patch("/api/v1/plans/" + id)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"price\": null}"))
+                .andExpect(status().isBadRequest());
+    }
+    
+    @Test
+    void testDraftClearRequiredFieldAccepted() throws Exception {
+        String id = createBaseDraft();
+        mockMvc.perform(patch("/api/v1/plans/" + id)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"price\": 100}"));
+                        
+        mockMvc.perform(patch("/api/v1/plans/" + id)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"price\": null}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.price").isEmpty());
+    }
+    
+    @Test
+    void testActiveClearRequiredFieldStatusDraftAccepted() throws Exception {
+        String id = createActivePlan();
+        mockMvc.perform(patch("/api/v1/plans/" + id)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"price\": null, \"status\": \"DRAFT\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.price").isEmpty())
+                .andExpect(jsonPath("$.status").value("DRAFT"));
+    }
+    
+    @Test
+    void testDraftClearRequiredFieldStatusActiveRejected() throws Exception {
+        String id = createBaseDraft();
+        mockMvc.perform(patch("/api/v1/plans/" + id)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"price\": null, \"status\": \"ACTIVE\"}"))
+                .andExpect(status().isBadRequest());
+    }
+    
+    @Test
+    void testCompareAtPriceLessThanPriceRejected() throws Exception {
+        String id = createBaseDraft();
+        mockMvc.perform(patch("/api/v1/plans/" + id)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"price\": 500, \"compareAtPrice\": 400}"))
+                .andExpect(status().isBadRequest());
+    }
+    
+    @Test
+    void testCompareAtPriceWithPriceAbsentOnDraftHandled() throws Exception {
+        String id = createBaseDraft();
+        mockMvc.perform(patch("/api/v1/plans/" + id)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"compareAtPrice\": 400}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.compareAtPrice").value(400.0));
+    }
+    
+    @Test
+    void testCreateDirectlyAsActiveWithIncompleteDataRejected() throws Exception {
+        String req = """
+        {
+            "name": "Active Plan",
+            "status": "ACTIVE"
+        }
+        """;
+        mockMvc.perform(post("/api/v1/plans")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(req))
+                .andExpect(status().isBadRequest());
+    }
+    
+    @Test
+    void testDuplicatePlanGetsNewSlugAndDraft() throws Exception {
+        String id = createActivePlan();
+        mockMvc.perform(post("/api/v1/plans/" + id + "/duplicate")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value("DRAFT"))
+                .andExpect(jsonPath("$.slug").value("base-plan-copy"));
+    }
+    
+    @Test
+    void testPublicLookupCannotRetrieveDraftById() throws Exception {
+        String id = createBaseDraft();
+        mockMvc.perform(get("/api/v1/plans/" + id))
+                .andExpect(status().isNotFound());
+    }
+    
+    @Test
+    void testPublicLookupCannotRetrieveDraftBySlug() throws Exception {
+        createBaseDraft(); // base-plan
+        mockMvc.perform(get("/api/v1/plans/slug/base-plan"))
+                .andExpect(status().isNotFound());
     }
 }
