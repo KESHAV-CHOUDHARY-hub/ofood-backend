@@ -13,7 +13,7 @@ public class WebConfig implements WebMvcConfigurer {
 
     private final String storageRootPath;
 
-    public WebConfig(@Value("${app.storage.local.root:./uploads}") String storageRootPath) {
+    public WebConfig(@Value("${app.storage.local.root:/tmp/ofood/uploads}") String storageRootPath) {
         this.storageRootPath = storageRootPath;
     }
 

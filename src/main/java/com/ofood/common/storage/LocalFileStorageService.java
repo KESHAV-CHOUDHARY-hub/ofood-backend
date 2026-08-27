@@ -25,7 +25,7 @@ public class LocalFileStorageService implements StorageService {
 
     private final Path rootLocation;
 
-    public LocalFileStorageService(@Value("${app.storage.local.root:./uploads}") String rootPath) {
+    public LocalFileStorageService(@Value("${app.storage.local.root:/tmp/ofood/uploads}") String rootPath) {
         this.rootLocation = Paths.get(rootPath).toAbsolutePath().normalize();
         try {
             Files.createDirectories(this.rootLocation);

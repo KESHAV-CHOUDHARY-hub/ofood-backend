@@ -40,7 +40,7 @@ app:
   storage:
     type: local
     local:
-      root: ./uploads
+      root: ${LOCAL_STORAGE_ROOT:/tmp/ofood/uploads}
       max-file-size: 5MB
 
 ofood:
