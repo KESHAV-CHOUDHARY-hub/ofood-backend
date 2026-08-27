@@ -6,7 +6,7 @@ import com.ofood.location.repository.ServicePincodeRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Optional;
+import java.util.List;
 
 @Service
 public class ServiceabilityService {
@@ -18,16 +18,20 @@ public class ServiceabilityService {
 
     @Transactional(readOnly = true)
     public ServiceabilityResponse checkServiceability(String pincode) {
-        Optional<ServicePincode> optionalPincode = pincodeRepository.findByPincode(pincode);
-        if (optionalPincode.isPresent()) {
-            ServicePincode sp = optionalPincode.get();
-            boolean isServiceable = "ACTIVE".equalsIgnoreCase(sp.getStatus()) && "ACTIVE".equalsIgnoreCase(sp.getCity().getStatus());
-            return new ServiceabilityResponse(
-                    isServiceable,
-                    pincode,
-                    sp.getCity().getName(),
-                    sp.getCity().getState()
-            );
+        List<ServicePincode> pincodes = pincodeRepository.findByPincode(pincode);
+        for (ServicePincode sp : pincodes) {
+            if ("ACTIVE".equalsIgnoreCase(sp.getStatus()) && "ACTIVE".equalsIgnoreCase(sp.getCity().getStatus())) {
+                return new ServiceabilityResponse(
+                        true,
+                        pincode,
+                        sp.getCity().getName(),
+                        sp.getCity().getState()
+                );
+            }
+        }
+        if (!pincodes.isEmpty()) {
+            ServicePincode sp = pincodes.get(0);
+            return new ServiceabilityResponse(false, pincode, sp.getCity().getName(), sp.getCity().getState());
         }
         return new ServiceabilityResponse(false, pincode, null, null);
     }

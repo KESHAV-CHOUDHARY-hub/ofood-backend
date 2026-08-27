@@ -3,6 +3,7 @@ package com.ofood.location.service;
 import com.ofood.location.dto.ServicePincodeRequest;
 import com.ofood.location.dto.ServicePincodeResponse;
 import com.ofood.location.model.City;
+import com.ofood.location.model.ServiceArea;
 import com.ofood.location.model.ServicePincode;
 import com.ofood.location.repository.CityRepository;
 import com.ofood.location.repository.ServicePincodeRepository;
@@ -47,17 +48,26 @@ public class ServicePincodeService {
 
     @Transactional
     public ServicePincodeResponse createPincode(ServicePincodeRequest request) {
-        if (pincodeRepository.existsByPincode(request.getPincode())) {
-            throw new IllegalArgumentException("Pincode already exists");
+        if (pincodeRepository.existsByCityIdAndPincodeAndAreaName(request.getCityId(), request.getPincode(), request.getAreaName())) {
+            throw new IllegalArgumentException("Service area already exists for this city and pincode");
         }
         
         City city = cityRepository.findById(request.getCityId())
                 .orElseThrow(() -> new IllegalArgumentException("City not found"));
 
+        validateServiceArea(request.getServiceArea());
+
         ServicePincode pincode = new ServicePincode();
         pincode.setPincode(request.getPincode());
+        pincode.setAreaName(request.getAreaName().trim());
+        pincode.setServiceArea(request.getServiceArea());
         pincode.setCity(city);
-        pincode.setStatus(request.getStatus() != null ? request.getStatus() : "ACTIVE");
+        
+        if (request.getIsActive() != null) {
+            pincode.setStatus(request.getIsActive() ? "ACTIVE" : "INACTIVE");
+        } else {
+            pincode.setStatus(request.getStatus() != null ? request.getStatus() : "ACTIVE");
+        }
         
         pincode = pincodeRepository.save(pincode);
         return mapToResponse(pincode);
@@ -68,16 +78,27 @@ public class ServicePincodeService {
         ServicePincode pincode = pincodeRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Pincode not found"));
 
-        if (!pincode.getPincode().equals(request.getPincode()) && pincodeRepository.existsByPincode(request.getPincode())) {
-            throw new IllegalArgumentException("Pincode already exists");
+        boolean uniquenessChanged = !pincode.getCity().getId().equals(request.getCityId())
+                || !pincode.getPincode().equals(request.getPincode())
+                || !pincode.getAreaName().equals(request.getAreaName());
+
+        if (uniquenessChanged && pincodeRepository.existsByCityIdAndPincodeAndAreaName(request.getCityId(), request.getPincode(), request.getAreaName())) {
+            throw new IllegalArgumentException("Service area already exists for this city and pincode");
         }
 
         City city = cityRepository.findById(request.getCityId())
                 .orElseThrow(() -> new IllegalArgumentException("City not found"));
+                
+        validateServiceArea(request.getServiceArea());
 
         pincode.setPincode(request.getPincode());
+        pincode.setAreaName(request.getAreaName().trim());
+        pincode.setServiceArea(request.getServiceArea());
         pincode.setCity(city);
-        if (request.getStatus() != null) {
+        
+        if (request.getIsActive() != null) {
+            pincode.setStatus(request.getIsActive() ? "ACTIVE" : "INACTIVE");
+        } else if (request.getStatus() != null) {
             pincode.setStatus(request.getStatus());
         }
         pincode.setUpdatedAt(Instant.now());
@@ -98,11 +119,36 @@ public class ServicePincodeService {
         ServicePincodeResponse response = new ServicePincodeResponse();
         response.setId(pincode.getId());
         response.setPincode(pincode.getPincode());
+        response.setAreaName(pincode.getAreaName());
+        response.setServiceArea(pincode.getServiceArea());
         response.setCityId(pincode.getCity().getId());
         response.setCityName(pincode.getCity().getName());
         response.setStatus(pincode.getStatus());
         response.setCreatedAt(pincode.getCreatedAt());
         response.setUpdatedAt(pincode.getUpdatedAt());
         return response;
+    }
+
+    private void validateServiceArea(ServiceArea serviceArea) {
+        if (serviceArea == null || serviceArea.getRing() == null) {
+            throw new IllegalArgumentException("Service area ring is required");
+        }
+        List<List<Double>> ring = serviceArea.getRing();
+        if (ring.size() < 3) {
+            throw new IllegalArgumentException("Service area must have at least 3 points to form a polygon");
+        }
+        for (List<Double> point : ring) {
+            if (point == null || point.size() != 2) {
+                throw new IllegalArgumentException("Each point in the service area must contain exactly 2 coordinates [latitude, longitude]");
+            }
+            double lat = point.get(0);
+            double lng = point.get(1);
+            if (lat < -90 || lat > 90) {
+                throw new IllegalArgumentException("Latitude must be between -90 and 90");
+            }
+            if (lng < -180 || lng > 180) {
+                throw new IllegalArgumentException("Longitude must be between -180 and 180");
+            }
+        }
     }
 }

@@ -1,5 +1,6 @@
 package com.ofood.location.dto;
 
+import com.ofood.location.model.ServiceArea;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -8,6 +9,8 @@ public class ServicePincodeResponse {
     private String pincode;
     private UUID cityId;
     private String cityName;
+    private String areaName;
+    private ServiceArea serviceArea;
     private String status;
     private Instant createdAt;
     private Instant updatedAt;
@@ -22,6 +25,10 @@ public class ServicePincodeResponse {
     public void setCityId(UUID cityId) { this.cityId = cityId; }
     public String getCityName() { return cityName; }
     public void setCityName(String cityName) { this.cityName = cityName; }
+    public String getAreaName() { return areaName; }
+    public void setAreaName(String areaName) { this.areaName = areaName; }
+    public ServiceArea getServiceArea() { return serviceArea; }
+    public void setServiceArea(ServiceArea serviceArea) { this.serviceArea = serviceArea; }
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
     public Instant getCreatedAt() { return createdAt; }

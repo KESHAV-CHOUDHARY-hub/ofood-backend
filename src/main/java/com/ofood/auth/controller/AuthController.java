@@ -7,6 +7,8 @@ import com.ofood.auth.dto.LoginRequest;
 import com.ofood.auth.dto.LoginResult;
 import com.ofood.auth.dto.RegisterRequest;
 import com.ofood.auth.dto.RegistrationResponse;
+import com.ofood.auth.dto.ForgotPasswordRequest;
+import com.ofood.auth.dto.ResetPasswordRequest;
 import com.ofood.auth.service.AuthService;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
@@ -101,6 +103,24 @@ public class AuthController {
                                                @Parameter(hidden = true) Authentication authentication) {
         authService.changePassword(request, authentication.getName());
         return ResponseEntity.ok().build();
+    }
+
+    @Operation(summary = "Request password reset", description = "Generates a reset credential and triggers an email notification. Returns generic success to prevent account enumeration.")
+    @ApiResponse(responseCode = "200", description = "Request processed successfully")
+    @ApiResponse(responseCode = "400", description = "Validation failed", content = @Content(schema = @Schema(implementation = com.ofood.auth.dto.ApiErrorResponse.class)))
+    @PostMapping("/forgot-password")
+    public ResponseEntity<com.ofood.auth.dto.ApiMessageResponse> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        authService.forgotPassword(request);
+        return ResponseEntity.ok(new com.ofood.auth.dto.ApiMessageResponse("If an account exists for this email address, password reset instructions have been sent."));
+    }
+
+    @Operation(summary = "Reset password", description = "Resets the user's password using a valid token and revokes existing sessions.")
+    @ApiResponse(responseCode = "200", description = "Password reset successfully")
+    @ApiResponse(responseCode = "400", description = "Validation failed, token invalid, expired, or used", content = @Content(schema = @Schema(implementation = com.ofood.auth.dto.ApiErrorResponse.class)))
+    @PostMapping("/reset-password")
+    public ResponseEntity<com.ofood.auth.dto.ApiMessageResponse> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        authService.resetPassword(request);
+        return ResponseEntity.ok(new com.ofood.auth.dto.ApiMessageResponse("Password has been successfully reset."));
     }
 
     @Operation(summary = "Get current user profile", description = "Returns the currently authenticated user's profile details. Requires a valid Bearer JWT.")

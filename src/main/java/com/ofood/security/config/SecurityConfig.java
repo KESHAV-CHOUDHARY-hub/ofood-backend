@@ -67,7 +67,9 @@ public class SecurityConfig {
             String uri = request.getRequestURI();
             return "/api/v1/auth/register".equals(uri)
                     || "/api/v1/auth/login".equals(uri)
-                    || "/api/v1/auth/refresh".equals(uri);
+                    || "/api/v1/auth/refresh".equals(uri)
+                    || "/api/v1/auth/forgot-password".equals(uri)
+                    || "/api/v1/auth/reset-password".equals(uri);
         };
 
         http
@@ -81,12 +83,15 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/register").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/login").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/refresh").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/v1/auth/forgot-password").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/v1/auth/reset-password").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/logout").authenticated()
                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/change-password").authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/v1/cities", "/api/v1/cities/{id}").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/pincodes", "/api/v1/pincodes/{id}").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/serviceability").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/plans", "/api/v1/plans/{id}", "/api/v1/plans/slug/{slug}").permitAll()
+                .requestMatchers(HttpMethod.GET, "/uploads/**").permitAll()
                 .requestMatchers("/actuator/**").hasAuthority("ROLE_ADMIN")
                 .requestMatchers(HttpMethod.GET, "/.well-known/jwks.json").permitAll()
                 .requestMatchers(HttpMethod.GET, "/.well-known/openid-configuration").permitAll()

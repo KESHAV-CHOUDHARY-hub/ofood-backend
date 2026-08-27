@@ -1,6 +1,8 @@
 package com.ofood.location.model;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -11,8 +13,15 @@ public class ServicePincode {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false)
     private String pincode;
+
+    @Column(name = "area_name", nullable = false)
+    private String areaName;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "service_area", columnDefinition = "jsonb")
+    private ServiceArea serviceArea;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "city_id", nullable = false)
@@ -31,6 +40,10 @@ public class ServicePincode {
     public void setId(UUID id) { this.id = id; }
     public String getPincode() { return pincode; }
     public void setPincode(String pincode) { this.pincode = pincode; }
+    public String getAreaName() { return areaName; }
+    public void setAreaName(String areaName) { this.areaName = areaName; }
+    public ServiceArea getServiceArea() { return serviceArea; }
+    public void setServiceArea(ServiceArea serviceArea) { this.serviceArea = serviceArea; }
     public City getCity() { return city; }
     public void setCity(City city) { this.city = city; }
     public String getStatus() { return status; }

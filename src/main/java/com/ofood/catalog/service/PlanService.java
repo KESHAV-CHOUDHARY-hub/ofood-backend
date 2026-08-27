@@ -11,8 +11,10 @@ import com.ofood.catalog.exception.CatalogValidationException;
 import com.ofood.catalog.model.Plan;
 import com.ofood.catalog.model.PlanMeal;
 import com.ofood.catalog.repository.PlanRepository;
+import com.ofood.common.storage.StorageService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -29,10 +31,12 @@ public class PlanService {
 
     private final PlanRepository planRepository;
     private final ObjectMapper objectMapper;
+    private final StorageService storageService;
 
-    public PlanService(PlanRepository planRepository, ObjectMapper objectMapper) {
+    public PlanService(PlanRepository planRepository, ObjectMapper objectMapper, StorageService storageService) {
         this.planRepository = planRepository;
         this.objectMapper = objectMapper;
+        this.storageService = storageService;
     }
 
     @Transactional(readOnly = true)
@@ -196,6 +200,118 @@ public class PlanService {
             plan.setUpdatedAt(Instant.now());
         }
         planRepository.saveAll(plans);
+    }
+
+    @Transactional(noRollbackFor = Exception.class)
+    public PlanResponse uploadPrimaryImage(UUID id, MultipartFile file) {
+        Plan plan = planRepository.findById(id)
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND, "Plan not found"));
+        
+        String newReference = storageService.storeFile(file, "plans", id);
+        String oldReference = plan.getImage();
+        
+        plan.setImage(newReference);
+        plan.setUpdatedAt(Instant.now());
+        
+        try {
+            plan = planRepository.save(plan);
+        } catch (Exception ex) {
+            storageService.deleteFile(newReference);
+            throw ex;
+        }
+
+        if (oldReference != null) {
+            storageService.deleteFile(oldReference);
+        }
+        return mapToResponse(plan);
+    }
+
+    @Transactional(noRollbackFor = Exception.class)
+    public PlanResponse uploadGalleryImages(UUID id, List<MultipartFile> files) {
+        Plan plan = planRepository.findById(id)
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND, "Plan not found"));
+        
+        List<String> newReferences = new ArrayList<>();
+        
+        // validate all first
+        for (MultipartFile file : files) {
+            if (file.isEmpty()) {
+                throw new IllegalArgumentException("Cannot store empty file.");
+            }
+            String contentType = file.getContentType();
+            if (contentType == null || !List.of("image/jpeg", "image/png", "image/webp").contains(contentType)) {
+                throw new IllegalArgumentException("Unsupported file type. Only JPEG, PNG, and WEBP are allowed.");
+            }
+        }
+        
+        for (MultipartFile file : files) {
+            newReferences.add(storageService.storeFile(file, "plans", id));
+        }
+
+        com.fasterxml.jackson.databind.node.ArrayNode arrayNode;
+        if (plan.getGallery() == null || !plan.getGallery().isArray()) {
+            arrayNode = objectMapper.createArrayNode();
+        } else {
+            arrayNode = (com.fasterxml.jackson.databind.node.ArrayNode) plan.getGallery();
+        }
+        
+        for (String ref : newReferences) {
+            arrayNode.add(ref);
+        }
+        
+        plan.setGallery(arrayNode);
+        plan.setUpdatedAt(Instant.now());
+
+        try {
+            plan = planRepository.save(plan);
+        } catch (Exception ex) {
+            for (String ref : newReferences) {
+                storageService.deleteFile(ref);
+            }
+            throw ex;
+        }
+        return mapToResponse(plan);
+    }
+
+    @Transactional
+    public PlanResponse removePrimaryImage(UUID id) {
+        Plan plan = planRepository.findById(id)
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND, "Plan not found"));
+        
+        String oldReference = plan.getImage();
+        plan.setImage(null);
+        plan.setUpdatedAt(Instant.now());
+        
+        plan = planRepository.save(plan);
+        if (oldReference != null) {
+            storageService.deleteFile(oldReference);
+        }
+        return mapToResponse(plan);
+    }
+
+    @Transactional
+    public PlanResponse removeGalleryImage(UUID id, String imageUrl) {
+        Plan plan = planRepository.findById(id)
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND, "Plan not found"));
+        
+        if (plan.getGallery() != null && plan.getGallery().isArray()) {
+            com.fasterxml.jackson.databind.node.ArrayNode arrayNode = (com.fasterxml.jackson.databind.node.ArrayNode) plan.getGallery();
+            boolean found = false;
+            for (int i = 0; i < arrayNode.size(); i++) {
+                if (arrayNode.get(i).asText().equals(imageUrl)) {
+                    arrayNode.remove(i);
+                    found = true;
+                    break;
+                }
+            }
+            
+            if (found) {
+                plan.setUpdatedAt(Instant.now());
+                plan = planRepository.save(plan);
+                storageService.deleteFile(imageUrl);
+            }
+        }
+        return mapToResponse(plan);
     }
     
     private String generateSlug(String name) {

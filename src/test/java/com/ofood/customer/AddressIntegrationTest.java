@@ -5,6 +5,7 @@ import com.ofood.auth.model.User;
 import com.ofood.auth.repository.UserRepository;
 import com.ofood.customer.repository.AddressRepository;
 import com.ofood.location.model.City;
+import com.ofood.location.model.ServiceArea;
 import com.ofood.location.model.ServicePincode;
 import com.ofood.location.repository.CityRepository;
 import com.ofood.location.repository.ServicePincodeRepository;
@@ -12,6 +13,7 @@ import com.ofood.role.Role;
 import com.ofood.role.repository.RoleRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import com.ofood.location.model.ServicePincode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -103,15 +105,26 @@ class AddressIntegrationTest {
         city.setStatus("ACTIVE");
         city = cityRepository.save(city);
 
+        ServiceArea dummyArea = new ServiceArea();
+        dummyArea.setRing(java.util.List.of(
+            java.util.List.of(0.0, 0.0),
+            java.util.List.of(1.0, 0.0),
+            java.util.List.of(1.0, 1.0)
+        ));
+
         ServicePincode p1 = new ServicePincode();
         p1.setCity(city);
         p1.setPincode("560001");
+        p1.setAreaName("Area 1");
+        p1.setServiceArea(dummyArea);
         p1.setStatus("ACTIVE");
         pincodeRepository.save(p1);
 
         ServicePincode p2 = new ServicePincode();
         p2.setCity(city);
         p2.setPincode("560002");
+        p2.setAreaName("Area 2");
+        p2.setServiceArea(dummyArea);
         p2.setStatus("INACTIVE");
         pincodeRepository.save(p2);
     }

@@ -10,8 +10,10 @@ import com.ofood.auth.model.RefreshToken;
 import com.ofood.auth.model.User;
 import com.ofood.auth.repository.RefreshTokenRepository;
 import com.ofood.auth.repository.UserRepository;
+import com.ofood.auth.repository.PasswordResetTokenRepository;
 import com.ofood.role.Role;
 import com.ofood.role.repository.RoleRepository;
+import org.springframework.context.ApplicationEventPublisher;
 import com.ofood.security.jwt.JwtTokenService;
 import com.ofood.security.jwt.RsaKeyProperties;
 import org.junit.jupiter.api.BeforeEach;
@@ -51,6 +53,9 @@ class AuthServiceTest {
     private RefreshTokenRepository refreshTokenRepository;
 
     @Mock
+    private PasswordResetTokenRepository passwordResetTokenRepository;
+
+    @Mock
     private PasswordEncoder passwordEncoder;
 
     @Mock
@@ -58,6 +63,9 @@ class AuthServiceTest {
 
     @Mock
     private JwtTokenService jwtTokenService;
+    
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     private AuthService authService;
@@ -72,8 +80,8 @@ class AuthServiceTest {
         jwtProperties = new RsaKeyProperties();
         jwtProperties.setAccessTokenTtl(Duration.ofMinutes(10));
         AuthLockoutProperties lockoutProperties = new AuthLockoutProperties();
-        authService = new AuthService(userRepository, roleRepository, refreshTokenRepository, passwordEncoder,
-                authenticationManager, jwtTokenService, cookieProperties, jwtProperties, lockoutProperties);
+        authService = new AuthService(userRepository, roleRepository, refreshTokenRepository, passwordResetTokenRepository, passwordEncoder,
+                authenticationManager, jwtTokenService, cookieProperties, jwtProperties, lockoutProperties, eventPublisher);
     }
 
     @Test

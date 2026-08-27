@@ -10,8 +10,8 @@ import java.util.UUID;
 
 @Repository
 public interface ServicePincodeRepository extends JpaRepository<ServicePincode, UUID> {
-    Optional<ServicePincode> findByPincode(String pincode);
+    List<ServicePincode> findByPincode(String pincode);
     List<ServicePincode> findByCityId(UUID cityId);
-    boolean existsByPincode(String pincode);
+    boolean existsByCityIdAndPincodeAndAreaName(UUID cityId, String pincode, String areaName);
     List<ServicePincode> findByStatus(String status);
 }

@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -112,15 +113,16 @@ public class AddressService {
     }
 
     private ServicePincode validateServiceability(String pincodeStr) {
-        Optional<ServicePincode> optionalPincode = pincodeRepository.findByPincode(pincodeStr);
-        if (optionalPincode.isEmpty()) {
+        List<ServicePincode> pincodes = pincodeRepository.findByPincode(pincodeStr);
+        if (pincodes.isEmpty()) {
             throw new IllegalArgumentException("Pincode is not serviceable");
         }
-        ServicePincode sp = optionalPincode.get();
-        if (!"ACTIVE".equalsIgnoreCase(sp.getStatus()) || !"ACTIVE".equalsIgnoreCase(sp.getCity().getStatus())) {
-            throw new IllegalArgumentException("Pincode is temporarily unserviceable");
+        for (ServicePincode sp : pincodes) {
+            if ("ACTIVE".equalsIgnoreCase(sp.getStatus()) && "ACTIVE".equalsIgnoreCase(sp.getCity().getStatus())) {
+                return sp;
+            }
         }
-        return sp;
+        throw new IllegalArgumentException("Pincode is temporarily unserviceable");
     }
 
     private void mapRequestToAddress(AddressRequest request, Address address, City city) {

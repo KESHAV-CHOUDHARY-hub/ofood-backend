@@ -165,7 +165,7 @@ class ServiceabilityIntegrationTest {
         MvcResult pincodeResult = mockMvc.perform(post("/api/v1/pincodes")
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"pincode\":\"411001\",\"cityId\":\"" + cityId + "\"}"))
+                        .content("{\"pincode\":\"411001\",\"cityId\":\"" + cityId + "\",\"areaName\":\"Pune Area\",\"isActive\":true,\"serviceArea\":{\"ring\":[[0,0],[1,0],[1,1]]}}"))
                 .andExpect(status().isCreated())
                 .andReturn();
                 
@@ -186,7 +186,7 @@ class ServiceabilityIntegrationTest {
         mockMvc.perform(put("/api/v1/pincodes/" + pincodeId)
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"pincode\":\"411001\",\"cityId\":\"" + cityId + "\",\"status\":\"INACTIVE\"}"))
+                        .content("{\"pincode\":\"411001\",\"cityId\":\"" + cityId + "\",\"areaName\":\"Pune Area\",\"isActive\":false,\"serviceArea\":{\"ring\":[[0,0],[1,0],[1,1]]}}"))
                 .andExpect(status().isOk());
                 
         mockMvc.perform(get("/api/v1/serviceability?pincode=411001"))

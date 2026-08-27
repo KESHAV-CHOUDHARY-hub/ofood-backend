@@ -71,6 +71,12 @@ public class GlobalExceptionHandler {
         return new ApiErrorResponse("MALFORMED_JSON", "Malformed JSON request", org.slf4j.MDC.get("traceId"));
     }
 
+    @ExceptionHandler(org.springframework.web.multipart.MultipartException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiErrorResponse handleMultipartException(org.springframework.web.multipart.MultipartException ex) {
+        return new ApiErrorResponse("BAD_REQUEST", ex.getMessage(), org.slf4j.MDC.get("traceId"));
+    }
+
     @ExceptionHandler(ResponseStatusException.class)
     public org.springframework.http.ResponseEntity<ApiErrorResponse> handleResponseStatusException(ResponseStatusException ex) {
         return org.springframework.http.ResponseEntity.status(ex.getStatusCode())
