@@ -52,7 +52,8 @@ ofood:
       audience: ${OFOOD_JWT_AUDIENCE:ofood-api}
       access-token-ttl: ${OFOOD_JWT_ACCESS_TOKEN_TTL:10m}
       key-id: ${OFOOD_JWT_KEY_ID:ofood-dev-key}
-      private-key-path: ${OFOOD_JWT_PRIVATE_KEY_PATH}
+      private-key-pem: ${OFOOD_JWT_PRIVATE_KEY_PEM:}
+      private-key-path: ${OFOOD_JWT_PRIVATE_KEY_PATH:}
       public-key-path: ${OFOOD_JWT_PUBLIC_KEY_PATH:}
   auth:
     cookie:

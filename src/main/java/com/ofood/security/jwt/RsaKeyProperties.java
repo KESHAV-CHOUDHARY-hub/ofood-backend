@@ -17,7 +17,7 @@ public class RsaKeyProperties {
     private String audience;
     @NotBlank
     private String keyId;
-    @NotBlank
+    private String privateKeyPem;
     private String privateKeyPath;
     private String publicKeyPath;
     private Duration accessTokenTtl = Duration.ofMinutes(10);
@@ -44,6 +44,14 @@ public class RsaKeyProperties {
 
     public void setKeyId(String keyId) {
         this.keyId = keyId;
+    }
+
+    public String getPrivateKeyPem() {
+        return privateKeyPem;
+    }
+
+    public void setPrivateKeyPem(String privateKeyPem) {
+        this.privateKeyPem = privateKeyPem;
     }
 
     public String getPrivateKeyPath() {

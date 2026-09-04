@@ -32,19 +32,23 @@ public class RsaKeyProvider {
     }
 
     private void init() throws Exception {
+        String privatePem = properties.getPrivateKeyPem();
         String privatePath = properties.getPrivateKeyPath();
         String publicPath = properties.getPublicKeyPath();
         String keyId = properties.getKeyId();
 
-        if (privatePath == null || privatePath.isBlank()) {
-            throw new IllegalStateException("JWT private key path is not configured (ofood.security.jwt.private-key-path)");
-        }
         if (keyId == null || keyId.isBlank()) {
             throw new IllegalStateException("JWT key ID is not configured (ofood.security.jwt.key-id)");
         }
 
-        String privPem = readResourceAsString(privatePath);
-        PrivateKey privateKey = loadPrivateKeyFromPem(privPem);
+        PrivateKey privateKey;
+        if (privatePem != null && !privatePem.isBlank()) {
+            privateKey = loadPrivateKeyFromPem(privatePem);
+        } else if (privatePath != null && !privatePath.isBlank()) {
+            privateKey = loadPrivateKeyFromPem(readResourceAsString(privatePath));
+        } else {
+            throw new IllegalStateException("Either ofood.security.jwt.private-key-pem or ofood.security.jwt.private-key-path must be configured");
+        }
         PublicKey publicKey = (publicPath != null && !publicPath.isBlank())
                 ? loadPublicKeyFromPem(readResourceAsString(publicPath))
                 : derivePublicKeyFromPrivateKey(privateKey);

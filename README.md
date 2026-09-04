@@ -10,6 +10,26 @@ This is the Spring Boot backend for the OFOOD application.
 - Maven
 
 ### 2. Environment Configuration
+
+The application is fully configurable via standard Spring Boot environment variables.
+
+### JWT Keys Configuration
+
+For local development, generate and configure RSA keys as files:
+```bash
+OFOOD_JWT_PRIVATE_KEY_PATH=file:/path/to/dev-private.pem
+OFOOD_JWT_PUBLIC_KEY_PATH=file:/path/to/dev-public.pem
+```
+
+**AWS ECS / Production Configuration:**
+For secure production deployments, you can inject the private key directly as a PEM string via AWS Secrets Manager:
+```bash
+OFOOD_JWT_PRIVATE_KEY_PEM="-----BEGIN PRIVATE KEY-----\nMIIEvQIBAD...\n-----END PRIVATE KEY-----"
+```
+When `OFOOD_JWT_PRIVATE_KEY_PEM` is provided, the backend will dynamically parse it and derive the public key automatically.
+- Production private keys must **never** be committed to Git.
+- Production private keys must **never** be baked into the Docker image.
+- AWS ECS should inject the value securely from AWS Secrets Manager.
 The application requires certain environment variables to start, particularly the RSA private key for JWT signing.
 **WARNING: Never commit private keys or secrets to version control!**
 
