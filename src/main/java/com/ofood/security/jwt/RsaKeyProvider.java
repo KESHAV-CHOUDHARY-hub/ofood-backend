@@ -71,15 +71,26 @@ public class RsaKeyProvider {
         }
     }
 
-    private PrivateKey loadPrivateKeyFromPem(String pem) throws Exception {
-        String priv = pem.replaceAll("-----BEGIN (.*)PRIVATE KEY-----", "")
-                .replaceAll("-----END (.*)PRIVATE KEY-----", "")
-                .replaceAll("\n", "")
-                .replaceAll("\r", "");
-        byte[] keyBytes = Base64.getDecoder().decode(priv);
-        PKCS8EncodedKeySpec spec = new PKCS8EncodedKeySpec(keyBytes);
-        KeyFactory kf = KeyFactory.getInstance("RSA");
-        return kf.generatePrivate(spec);
+    private PrivateKey loadPrivateKeyFromPem(String pem) {
+        if (pem == null || pem.isBlank()) {
+            throw new IllegalArgumentException("Private key PEM cannot be null or blank");
+        }
+        try {
+            String normalized = pem.replace("\\n", "\n").replace("\\r", "\r").trim();
+            if (!normalized.contains("-----BEGIN") || !normalized.contains("-----END") || !normalized.contains("PRIVATE KEY-----")) {
+                throw new IllegalArgumentException("PEM does not contain required BEGIN/END PRIVATE KEY markers");
+            }
+            String base64Body = normalized
+                    .replaceAll("-----BEGIN (.*)PRIVATE KEY-----", "")
+                    .replaceAll("-----END (.*)PRIVATE KEY-----", "")
+                    .replaceAll("\\s+", "");
+            byte[] keyBytes = Base64.getDecoder().decode(base64Body);
+            PKCS8EncodedKeySpec spec = new PKCS8EncodedKeySpec(keyBytes);
+            KeyFactory kf = KeyFactory.getInstance("RSA");
+            return kf.generatePrivate(spec);
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to parse RSA private key from PEM. Please check the key format and encoding.", e);
+        }
     }
 
     private PublicKey loadPublicKeyFromPem(String pem) throws Exception {

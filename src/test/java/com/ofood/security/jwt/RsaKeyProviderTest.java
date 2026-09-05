@@ -97,4 +97,81 @@ class RsaKeyProviderTest {
         
         assertTrue(exception.getMessage().contains("must be configured"));
     }
+
+    @Test
+    void loadsPrivateKeyFromPemWithLiteralNewlines() throws Exception {
+        String literalNewlines = TEST_PRIVATE_KEY_PEM.replace("\n", "\\n");
+        properties.setPrivateKeyPem(literalNewlines);
+        RsaKeyProvider provider = new RsaKeyProvider(properties, resourceLoader);
+        assertNotNull(provider.getRsaKey());
+    }
+
+    @Test
+    void loadsPrivateKeyFromPemWithCRLF() throws Exception {
+        String crlf = TEST_PRIVATE_KEY_PEM.replace("\n", "\r\n");
+        properties.setPrivateKeyPem(crlf);
+        RsaKeyProvider provider = new RsaKeyProvider(properties, resourceLoader);
+        assertNotNull(provider.getRsaKey());
+    }
+
+    @Test
+    void loadsPrivateKeyFromPemWithExtraWhitespace() throws Exception {
+        String whitespace = "   \n\n  " + TEST_PRIVATE_KEY_PEM + "  \n\t  ";
+        properties.setPrivateKeyPem(whitespace);
+        RsaKeyProvider provider = new RsaKeyProvider(properties, resourceLoader);
+        assertNotNull(provider.getRsaKey());
+    }
+
+    @Test
+    void failsOnBlankPem() {
+        properties.setPrivateKeyPem("   \n   ");
+        IllegalStateException exception = assertThrows(IllegalStateException.class, () -> {
+            new RsaKeyProvider(properties, resourceLoader);
+        });
+        assertTrue(exception.getMessage().contains("must be configured"));
+    }
+
+    @Test
+    void failsOnMissingBeginMarker() {
+        String missingBegin = TEST_PRIVATE_KEY_PEM.replace("-----BEGIN PRIVATE KEY-----", "");
+        properties.setPrivateKeyPem(missingBegin);
+        IllegalStateException exception = assertThrows(IllegalStateException.class, () -> {
+            new RsaKeyProvider(properties, resourceLoader);
+        });
+        assertTrue(exception.getMessage().contains("check the key format"));
+    }
+
+    @Test
+    void failsOnMissingEndMarker() {
+        String missingEnd = TEST_PRIVATE_KEY_PEM.replace("-----END PRIVATE KEY-----", "");
+        properties.setPrivateKeyPem(missingEnd);
+        IllegalStateException exception = assertThrows(IllegalStateException.class, () -> {
+            new RsaKeyProvider(properties, resourceLoader);
+        });
+        assertTrue(exception.getMessage().contains("check the key format"));
+    }
+
+    @Test
+    void failsOnInvalidBase64() {
+        String invalidBase64 = "-----BEGIN PRIVATE KEY-----\n" +
+                "!!!!INVALID_BASE64!!!!\n" +
+                "-----END PRIVATE KEY-----";
+        properties.setPrivateKeyPem(invalidBase64);
+        IllegalStateException exception = assertThrows(IllegalStateException.class, () -> {
+            new RsaKeyProvider(properties, resourceLoader);
+        });
+        assertTrue(exception.getMessage().contains("check the key format"));
+    }
+
+    @Test
+    void failsOnInvalidPkcs8Bytes() {
+        String invalidPkcs8 = "-----BEGIN PRIVATE KEY-----\n" +
+                "dGVzdA==\n" +
+                "-----END PRIVATE KEY-----";
+        properties.setPrivateKeyPem(invalidPkcs8);
+        IllegalStateException exception = assertThrows(IllegalStateException.class, () -> {
+            new RsaKeyProvider(properties, resourceLoader);
+        });
+        assertTrue(exception.getMessage().contains("check the key format"));
+    }
 }
